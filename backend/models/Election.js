@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const electionSchema = new mongoose.Schema(
   {
+    type: { type: String, default: 'custom' },
     title: { type: String, required: true },
     description: { type: String, default: '' },
     startDate: { type: Date, required: true },

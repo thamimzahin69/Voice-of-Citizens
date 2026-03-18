@@ -7,12 +7,18 @@ const apiClient = axios.create({
   },
 });
 
-// Add a request interceptor to attach auth token
+// Add a request interceptor to attach auth token and support multipart uploads
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // If we're sending FormData (file upload), let the browser set the correct content type
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
+
   return config;
 });
 

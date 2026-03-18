@@ -21,6 +21,13 @@ async function register(req, res, next) {
     }
 
     const user = new User({ name, email, nid });
+
+    // Make the first registered user an admin for initial setup
+    const existingUsers = await User.countDocuments();
+    if (existingUsers === 0) {
+      user.role = 'admin';
+    }
+
     user.password = password;
 
     if (req.file) {

@@ -9,6 +9,8 @@ import SignIn from '../pages/Auth/SignIn';
 import SignUp from '../pages/Auth/SignUp';
 import Overview from '../pages/Dashboard/Overview';
 import CreateElection from '../pages/Dashboard/CreateElection';
+import AdminDashboard from '../pages/Dashboard/AdminDashboard';
+import AdminCreateElection from '../pages/Dashboard/AdminCreateElection';
 import JoinElection from '../pages/Dashboard/JoinElection';
 import ElectionHistory from '../pages/Dashboard/ElectionHistory';
 import Predictions from '../pages/Dashboard/Predictions';
@@ -39,9 +41,8 @@ export default function AppRoutes() {
             <Route index element={<Navigate to="overview" replace />} />
             <Route path="overview" element={<Overview />} />
             <Route path="create-election" element={<CreateElection />} />
-            <Route path="join-election" element={<JoinElection />} />
-            <Route path="history" element={<ElectionHistory />} />
-            <Route path="predictions" element={<Predictions />} />
+          <Route path="admin" element={<AdminDashboard />} />
+          <Route path="admin/create" element={<AdminCreateElection />} />
           </Route>
         </Route>
 

@@ -17,6 +17,7 @@ export default function DashboardLayout() {
         <nav className="dashboard-nav">
           <NavLink to="overview">Overview</NavLink>
           <NavLink to="create-election">Create Election</NavLink>
+          {isAdmin && <NavLink to="admin">Admin panel</NavLink>}
           <NavLink to="join-election">Join Election</NavLink>
           <NavLink to="history">History</NavLink>
           <NavLink to="predictions">Predictions</NavLink>

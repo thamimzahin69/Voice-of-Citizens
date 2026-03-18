@@ -7,6 +7,7 @@ const candidateSchema = new mongoose.Schema(
     party: { type: String, default: '' },
     manifesto: { type: String, default: '' },
     voteCount: { type: Number, default: 0 },
+    imagePath: { type: String },
   },
   { timestamps: true }
 );

@@ -19,7 +19,7 @@ export default function Navbar() {
           {user ? (
             <>
               <Link to="/dashboard/overview">Dashboard</Link>
-              {isAdmin && <Link to="/dashboard/create-election">Create Election</Link>}
+              {isAdmin && <Link to="/dashboard/admin">Admin</Link>}
               <button type="button" className="link-button" onClick={signOut}>
                 Sign out
               </button>

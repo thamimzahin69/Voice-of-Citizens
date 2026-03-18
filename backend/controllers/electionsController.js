@@ -4,15 +4,41 @@ const Vote = require('../models/Vote');
 
 async function createElection(req, res, next) {
   try {
-    const { title, description, startDate, endDate } = req.body;
+    const { type, title, description, startDate, endDate } = req.body;
+
     const election = await Election.create({
+      type,
       title,
       description,
       startDate,
       endDate,
       createdBy: req.user._id,
     });
-    res.status(201).json(election);
+
+    // Expect candidates to be sent as JSON with optional image files in `candidateImages`
+    const candidatesPayload = req.body.candidates ? JSON.parse(req.body.candidates) : [];
+    const files = (req.files?.candidateImages || []).slice();
+
+    const createdCandidates = [];
+
+    for (const candidateData of candidatesPayload) {
+      const candidate = new Candidate({
+        election: election._id,
+        name: candidateData.name,
+        party: candidateData.party,
+        manifesto: candidateData.manifesto,
+      });
+
+      const file = files.shift();
+      if (file) {
+        candidate.imagePath = file.path;
+      }
+
+      await candidate.save();
+      createdCandidates.push(candidate);
+    }
+
+    res.status(201).json({ ...election.toObject(), candidates: createdCandidates });
   } catch (err) {
     next(err);
   }
@@ -23,6 +49,15 @@ async function getElection(req, res, next) {
     const election = await Election.findById(req.params.id);
     if (!election) return res.status(404).json({ message: 'Election not found' });
     res.json(election);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function listAllElections(req, res, next) {
+  try {
+    const elections = await Election.find().sort({ createdAt: -1 });
+    res.json(elections);
   } catch (err) {
     next(err);
   }
@@ -151,6 +186,7 @@ async function predictions(req, res, next) {
 module.exports = {
   createElection,
   getElection,
+  listAllElections,
   listActiveElections,
   listHistory,
   listCandidates,
