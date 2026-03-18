@@ -1,41 +1,59 @@
+﻿const path = require('path');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-require('dotenv').config(); // Loads the variables from your .env file
+const dotenv = require('dotenv');
 
-// Initialize the Express app
+dotenv.config();
+
+const authRoutes = require('./routes/auth');
+const electionRoutes = require('./routes/elections');
+const dashboardRoutes = require('./routes/dashboard');
+const faqRoutes = require('./routes/faq');
+const complaintRoutes = require('./routes/complaints');
+const errorHandler = require('./middleware/errorHandler');
+
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors()); // Allows your React frontend to communicate with this backend
-app.use(express.json()); // Allows your server to accept and read JSON data (like vote submissions!)
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Connect to MongoDB
-const uri = process.env.MONGO_URI;
-mongoose.connect(uri)
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// API routes
+app.use('/api/auth', authRoutes);
+app.use('/api/elections', electionRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/faq', faqRoutes);
+app.use('/api/complaints', complaintRoutes);
+
+// Simple health check endpoint
+app.get('/api/test', (req, res) => {
+  res.json({
+    message: 'Connection successful! ',
+    project: 'Voice of Citizens',
+    status: 'Backend is talking to Frontend!',
+  });
+});
+
+// Catch-all route
+app.get('/{*splat}', (req, res) => {
+    res.sendFile(path.join(__dirname, 'client', 'build', 'index.html'));
+});
+
+app.use(errorHandler);
+
+mongoose
+  .connect(process.env.MONGO_URI)
   .then(() => {
     console.log('🗳️  MongoDB database connection established successfully!');
+    app.listen(port, () => {
+      console.log(`🚀 Server is running on port: ${port}`);
+    });
   })
   .catch((err) => {
-    console.error('❌ MongoDB connection error:', err);
+    console.error(' MongoDB connection error:', err);
   });
-
-// A simple test route
-app.get('/', (req, res) => {
-  res.send('Welcome to the Voice of Citizens API!');
-});
-
-// A simple API route for the frontend to fetch
-app.get('/api/test', (req, res) => {
-  res.json({ 
-    message: "Connection successful! 🚀", 
-    project: "Voice of Citizens",
-    status: "Backend is talking to Frontend!"
-  });
-});
-
-// Start the server
-app.listen(port, () => {
-  console.log(`🚀 Server is running on port: ${port}`);
-});
