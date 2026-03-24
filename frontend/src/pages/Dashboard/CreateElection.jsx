@@ -32,9 +32,9 @@ export default function CreateElection() {
       <form className="form-stack" onSubmit={handleSubmit}>
         <Input
           label="Election title"
-          name="name"
-          value={form.name}
-          onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+          name="title"
+          value={form.title}
+          onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
           required
         />
         <label className="form-field">

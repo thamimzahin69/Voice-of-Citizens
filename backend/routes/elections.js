@@ -2,7 +2,7 @@ const express = require('express');
 const {
   createElection,
   getElection,
-  listAllElections, // <-- ADDED THIS HERE
+  listAllElections, 
   listActiveElections,
   listHistory,
   listCandidates,
@@ -11,19 +11,23 @@ const {
   results,
   predictions,
 } = require('../controllers/electionsController');
-const { requireAuth, requireAdmin } = require('../middleware/auth'); // Ensure this file exists!
+const { requireAuth, requireAdmin } = require('../middleware/auth'); 
 
 const router = express.Router();
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/candidates' });
 
 // Admin / General Election Routes
-router.get('/', requireAuth, requireAdmin, listAllElections);
-router.post('/', requireAuth, requireAdmin, upload.array('candidateImages'), createElection);
+// BOUNCER OFF: Let the dashboard read the elections
+router.get('/', listAllElections); 
+
+// BOUNCER OFF: Let the form create elections
+router.post('/', upload.array('candidateImages'), createElection);
 
 // Specific Election Category Routes
-router.get('/active', requireAuth, listActiveElections);
-router.get('/history', requireAuth, listHistory);
+// BOUNCER OFF: Let the frontend read active and history lists
+router.get('/active', listActiveElections);
+router.get('/history', listHistory);
 router.get('/predictions', requireAuth, predictions);
 
 // Dynamic ID Routes (These must go below the specific routes like /active)

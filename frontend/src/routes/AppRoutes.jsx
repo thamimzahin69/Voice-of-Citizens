@@ -40,7 +40,7 @@ export default function AppRoutes() {
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<Navigate to="overview" replace />} />
             <Route path="overview" element={<Overview />} />
-            <Route path="create-election" element={<CreateElection />} />
+            {/* <Route path="create-election" element={<CreateElection />} /> */}
           <Route path="admin" element={<AdminDashboard />} />
           <Route path="admin/create" element={<AdminCreateElection />} />
           </Route>

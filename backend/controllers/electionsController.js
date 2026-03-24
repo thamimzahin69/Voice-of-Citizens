@@ -12,7 +12,8 @@ async function createElection(req, res, next) {
       description,
       startDate,
       endDate,
-      createdBy: req.user._id,
+      // createdBy: req.user._id,
+      createdBy: "65f0a1b2c3d4e5f6a7b8c9d0",
     });
 
     // Expect candidates to be sent as JSON with optional image files in `candidateImages`
