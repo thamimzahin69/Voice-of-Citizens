@@ -14,13 +14,21 @@ async function register(req, res, next) {
       return res.status(422).json({ message: 'Validation failed', errors: errors.array() });
     }
 
-    const { name, email, password, nid } = req.body;
+    const { name, email, password, nid, age, gender, address, locality } = req.body;
     const existing = await User.findOne({ email });
     if (existing) {
       return res.status(409).json({ message: 'Email already in use' });
     }
 
-    const user = new User({ name, email, nid });
+    const user = new User({ 
+      name, 
+      email, 
+      nid,
+      age: age ? parseInt(age) : undefined,
+      gender: gender || undefined,
+      address: address || undefined,
+      locality: locality || undefined,
+    });
 
     // Make the first registered user an admin for initial setup
     const existingUsers = await User.countDocuments();

@@ -113,6 +113,12 @@ async function castVote(req, res, next) {
     const { candidateId } = req.body;
     const voterId = req.user._id;
 
+    // Get the voter's anonymous hash
+    const voter = await require('../models/User').findById(voterId);
+    if (!voter) {
+      return res.status(404).json({ message: 'Voter not found' });
+    }
+
     // Prevent double voting
     const already = await Vote.findOne({ election: electionId, voter: voterId });
     if (already) {
@@ -123,6 +129,7 @@ async function castVote(req, res, next) {
       election: electionId,
       candidate: candidateId,
       voter: voterId,
+      anonymousHash: voter.anonymousHash, // Store anonymous hash for vote tracking
       ipAddress: req.ip,
     });
 

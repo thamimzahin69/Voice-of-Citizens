@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const userSchema = new mongoose.Schema(
   {
@@ -9,9 +10,28 @@ const userSchema = new mongoose.Schema(
     role: { type: String, enum: ['admin', 'user'], default: 'user' },
     nid: { type: String, trim: true },
     documentPath: { type: String },
+    documentStatus: { type: String, enum: ['pending', 'verified', 'rejected'], default: 'pending' },
+    documentVerifiedAt: { type: Date },
+    documentVerifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    age: { type: Number, min: 18, max: 120 },
+    gender: { type: String, enum: ['male', 'female', 'other', ''] },
+    address: { type: String, trim: true },
+    locality: { type: String, trim: true }, // For ballot assignment
+    anonymousHash: { type: String, unique: true }, // Hash for anonymous voting
   },
   { timestamps: true }
 );
+
+userSchema.pre('save', function (next) {
+  if (!this.anonymousHash) {
+    // nid + random componet = secret u 
+    this.anonymousHash = crypto
+      .createHash('sha256')
+      .update(this.nid + Date.now() + Math.random().toString())
+      .digest('hex');
+  }
+  next();
+});
 
 userSchema.virtual('password').set(function (val) {
   this.passwordHash = bcrypt.hashSync(val, 10);
@@ -24,6 +44,7 @@ userSchema.methods.verifyPassword = function (password) {
 userSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.passwordHash;
+  delete obj.anonymousHash;
   return obj;
 };
 

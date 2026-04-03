@@ -11,6 +11,8 @@ const electionRoutes = require('./routes/elections');
 const dashboardRoutes = require('./routes/dashboard');
 const faqRoutes = require('./routes/faq');
 const complaintRoutes = require('./routes/complaints');
+const adminRoutes = require('./routes/admin');
+const ballotRoutes = require('./routes/ballot');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -29,6 +31,8 @@ app.use('/api/elections', electionRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/faq', faqRoutes);
 app.use('/api/complaints', complaintRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/ballots', ballotRoutes);
 
 // Simple health check endpoint
 app.get('/api/test', (req, res) => {
