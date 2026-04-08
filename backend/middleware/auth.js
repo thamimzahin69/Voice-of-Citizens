@@ -15,6 +15,10 @@ async function requireAuth(req, res, next) {
     const payload = jwt.verify(token, JWT_SECRET);
     const user = await User.findById(payload.userId).lean();
     if (!user) return res.status(401).json({ message: 'Invalid token' });
+    
+    // ✅ Add an `id` alias for convenience (used in electionsController)
+    user.id = user._id.toString();
+    
     req.user = user;
     next();
   } catch (err) {

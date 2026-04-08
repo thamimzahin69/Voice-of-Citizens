@@ -9,6 +9,7 @@ const electionSchema = new mongoose.Schema(
     endDate: { type: Date, required: true },
     isPublished: { type: Boolean, default: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    voters: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]   // <-- add this line
   },
   { timestamps: true }
 );

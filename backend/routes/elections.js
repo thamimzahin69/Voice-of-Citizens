@@ -1,8 +1,7 @@
 const express = require('express');
 const {
   createElection,
-  getElection,
-  listAllElections, 
+  listAllElections,
   listActiveElections,
   listHistory,
   listCandidates,
@@ -10,28 +9,36 @@ const {
   castVote,
   results,
   predictions,
+  getJoinableElections,
+  joinElection,
+  getElectionStatus,
+  getAllElections,
+  getElectionById,
 } = require('../controllers/electionsController');
-const { requireAuth, requireAdmin } = require('../middleware/auth'); 
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/candidates' });
 
-// Admin / General Election Routes
-// BOUNCER OFF: Let the dashboard read the elections
-router.get('/', listAllElections); 
+// ========== Election listing (authenticated) ==========
+router.get('/', requireAuth, getAllElections);
 
-// BOUNCER OFF: Let the form create elections
-router.post('/', upload.array('candidateImages'), createElection);
+// ========== Admin create election (require auth then admin) ==========
+router.post('/', requireAuth, requireAdmin, upload.array('candidateImages'), createElection);  // FIXED
 
-// Specific Election Category Routes
-// BOUNCER OFF: Let the frontend read active and history lists
+// ========== Special category routes ==========
 router.get('/active', listActiveElections);
 router.get('/history', listHistory);
 router.get('/predictions', requireAuth, predictions);
 
-// Dynamic ID Routes (These must go below the specific routes like /active)
-router.get('/:id', requireAuth, getElection);
+// ========== Joinable elections ==========
+router.get('/joinable', requireAuth, getJoinableElections);
+router.post('/:id/join', requireAuth, joinElection);
+
+// ========== Dynamic ID routes ==========
+router.get('/:id', requireAuth, getElectionById);
+router.get('/:id/status', requireAuth, getElectionStatus);
 router.get('/:id/candidates', requireAuth, listCandidates);
 router.get('/:id/manifestos', requireAuth, listManifestos);
 router.post('/:id/vote', requireAuth, castVote);

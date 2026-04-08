@@ -1,10 +1,14 @@
-﻿const path = require('path');
+﻿const dns = require('dns'); // 👈 1. ADD THIS: Import the built-in DNS module
+const path = require('path');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 
 dotenv.config();
+
+// 👈 2. ADD THIS: Force Node to use Google's DNS to bypass the SRV block
+dns.setServers(['8.8.8.8', '8.8.4.4']); 
 
 const authRoutes = require('./routes/auth');
 const electionRoutes = require('./routes/elections');

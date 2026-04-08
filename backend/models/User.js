@@ -8,7 +8,8 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ['admin', 'user'], default: 'user' },
-    nid: { type: String, trim: true },
+    // NID is now required and unique
+    nid: { type: String, required: true, unique: true, trim: true },
     documentPath: { type: String },
     documentStatus: { type: String, enum: ['pending', 'verified', 'rejected'], default: 'pending' },
     documentVerifiedAt: { type: Date },
@@ -16,15 +17,16 @@ const userSchema = new mongoose.Schema(
     age: { type: Number, min: 18, max: 120 },
     gender: { type: String, enum: ['male', 'female', 'other', ''] },
     address: { type: String, trim: true },
-    locality: { type: String, trim: true }, // For ballot assignment
-    anonymousHash: { type: String, unique: true }, // Hash for anonymous voting
+    locality: { type: String, trim: true },
+    anonymousHash: { type: String, unique: true },
+    joinedElections: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Election' }]
   },
   { timestamps: true }
 );
 
 userSchema.pre('save', function (next) {
   if (!this.anonymousHash) {
-    // nid + random componet = secret u 
+    // Generate anonymous hash using NID + timestamp + random
     this.anonymousHash = crypto
       .createHash('sha256')
       .update(this.nid + Date.now() + Math.random().toString())

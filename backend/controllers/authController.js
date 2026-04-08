@@ -15,9 +15,17 @@ async function register(req, res, next) {
     }
 
     const { name, email, password, nid, age, gender, address, locality } = req.body;
-    const existing = await User.findOne({ email });
-    if (existing) {
+
+    // Check if email already exists
+    const existingEmail = await User.findOne({ email });
+    if (existingEmail) {
       return res.status(409).json({ message: 'Email already in use' });
+    }
+
+    // Check if NID already exists
+    const existingNid = await User.findOne({ nid });
+    if (existingNid) {
+      return res.status(409).json({ message: 'NID already registered' });
     }
 
     const user = new User({ 
