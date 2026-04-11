@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-userSchema.pre('save', function (next) {
+userSchema.pre('save', function () {
   if (!this.anonymousHash) {
     // Generate anonymous hash using NID + timestamp + random
     this.anonymousHash = crypto
@@ -32,7 +32,7 @@ userSchema.pre('save', function (next) {
       .update(this.nid + Date.now() + Math.random().toString())
       .digest('hex');
   }
-  next();
+  // Don't need to call next() - just return implicitly
 });
 
 userSchema.virtual('password').set(function (val) {

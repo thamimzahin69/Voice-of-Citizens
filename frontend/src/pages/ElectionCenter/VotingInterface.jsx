@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../../api/apiClient';
 import { useAuth } from '../../context/AuthContext';
+import VotingTimer from '../../components/election/VotingTimer';
 
 export default function VotingInterface() {
   const { electionId } = useParams();
@@ -96,6 +97,7 @@ export default function VotingInterface() {
 
   return (
     <div className="voting-interface">
+      <VotingTimer />
       <h2>Cast Your Vote</h2>
       {error && <p className="error">{error}</p>}
       <ul className="candidates-list">

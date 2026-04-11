@@ -35,7 +35,7 @@ export default function JoinElection() {
   return (
     <section className="page">
       <header className="page-header">
-        <h1>All Elections</h1>
+        <h1>✨ All Elections</h1>
         <p>Browse all elections, view details, and vote (NID verification required).</p>
       </header>
       <div className="grid">
@@ -44,29 +44,29 @@ export default function JoinElection() {
         ) : (
           elections.map((el) => (
             <Card key={el._id} title={el.title} className="election-card">
-              <p className="text-gray-600 mb-2">{el.description}</p>
-              <div className="mb-2">
-                <span className={`inline-block px-2 py-1 text-xs rounded-full mr-2 ${
-                  el.status === 'active' ? 'bg-green-100 text-green-800' :
-                  el.status === 'finished' ? 'bg-gray-100 text-gray-800' : 'bg-yellow-100 text-yellow-800'
+              <p className="text-gray-600 mb-3">{el.description}</p>
+              <div className="mb-3">
+                <span className={`badge ${
+                  el.status === 'active' ? 'badge-active' :
+                  el.status === 'finished' ? 'badge-finished' : 'badge-upcoming'
                 }`}>
-                  {el.status.toUpperCase()}
+                  {el.status === 'active' ? '🔴 Active' :
+                   el.status === 'finished' ? '✓ Finished' : '⏰ Upcoming'}
                 </span>
                 {el.hasVoted && (
-                  <span className="inline-block px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
-                    ✓ Voted
-                  </span>
+                  <span className="badge badge-voted">✓ Voted</span>
                 )}
-                <span className="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600 ml-2">
-                  {el.candidateCount} candidate{el.candidateCount !== 1 ? 's' : ''}
+                <span className="badge badge-upcoming" style={{background: 'linear-gradient(135deg, #e8d5f2 0%, #d8bff0 100%)', color: '#5a3f7d'}}>
+                  👥 {el.candidateCount} candidate{el.candidateCount !== 1 ? 's' : ''}
                 </span>
               </div>
-              <p className="text-sm text-gray-500 mb-1">
-                📅 {formatDate(el.startDate)} – {formatDate(el.endDate)}
-              </p>
+              <div className="election-meta">
+                <span className="election-meta-icon">🗓️</span>
+                <span>{formatDate(el.startDate)} – {formatDate(el.endDate)}</span>
+              </div>
               <div className="card-actions mt-3">
                 <Link to={`/election/${el._id}`} className="btn btn-primary">
-                  View Details
+                  View Details →
                 </Link>
               </div>
             </Card>

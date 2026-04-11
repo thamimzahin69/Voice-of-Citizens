@@ -13,6 +13,7 @@ import AdminCreateElection from '../pages/Dashboard/AdminCreateElection';
 import JoinElection from '../pages/Dashboard/JoinElection';
 import ElectionHistory from '../pages/Dashboard/ElectionHistory';
 import Predictions from '../pages/Dashboard/Predictions';
+import ComplaintsPageContainer from '../pages/Dashboard/ComplaintsPageContainer';
 import ElectionDetails from '../pages/ElectionCenter/ElectionDetails'; // NEW
 import FAQ from '../pages/FAQ/FAQ';
 import Complaints from '../pages/Complaints/Complaints';
@@ -42,6 +43,7 @@ export default function AppRoutes() {
             <Route path="join-election" element={<JoinElection />} />
             <Route path="history" element={<ElectionHistory />} />
             <Route path="predictions" element={<Predictions />} />
+            <Route path="complaints" element={<ComplaintsPageContainer />} />
           </Route>
 
           {/* Election Details – standalone */}

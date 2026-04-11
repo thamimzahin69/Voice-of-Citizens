@@ -1,7 +1,11 @@
 function errorHandler(err, req, res, next) {
-  console.error(err);
-  res.status(err.status || 500).json({
-    message: err.message || 'An unexpected error occurred',
+  console.error('Error:', err);
+  
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || 'An unexpected error occurred';
+  
+  res.status(status).json({
+    message: message,
   });
 }
 

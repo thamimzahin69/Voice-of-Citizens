@@ -21,6 +21,7 @@ export default function DashboardLayout() {
           <NavLink to="join-election">Join Election</NavLink>
           <NavLink to="history">History</NavLink>
           <NavLink to="predictions">Predictions</NavLink>
+          <NavLink to="complaints">Complaints</NavLink>
         </nav>
         <button type="button" className="sign-out" onClick={signOut}>
           Sign out

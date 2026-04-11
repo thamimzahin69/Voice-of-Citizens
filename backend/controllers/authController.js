@@ -1,5 +1,4 @@
 const jwt = require('jsonwebtoken');
-const { validationResult } = require('express-validator');
 const User = require('../models/User');
 const { JWT_SECRET } = require('../middleware/auth');
 
@@ -9,12 +8,22 @@ function generateToken(user) {
 
 async function register(req, res, next) {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(422).json({ message: 'Validation failed', errors: errors.array() });
+    const { name, email, password, nid, age, gender, address, locality } = req.body;
+
+    // Basic validation
+    if (!name || !email || !password || !nid) {
+      return res.status(422).json({ message: 'All required fields must be filled' });
     }
 
-    const { name, email, password, nid, age, gender, address, locality } = req.body;
+    if (password.length < 6) {
+      return res.status(422).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    // Check if email is valid format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(422).json({ message: 'Invalid email format' });
+    }
 
     // Check if email already exists
     const existingEmail = await User.findOne({ email });
