@@ -3,6 +3,106 @@ const Election = require('../models/Election');
 const Vote = require('../models/Vote');
 const Candidate = require('../models/Candidate');
 
+function parseCsvRows(fileContent) {
+  const lines = fileContent.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (!lines.length) return [];
+
+  const header = lines[0].split(',').map((col) => col.trim().toLowerCase());
+  const hasHeader = header.includes('name') && header.includes('email');
+  const rows = hasHeader ? lines.slice(1) : lines;
+
+  return rows.map((line) => {
+    const values = line.split(',').map((value) => value.trim());
+    if (hasHeader) {
+      return header.reduce((acc, key, index) => {
+        acc[key] = values[index] || '';
+        return acc;
+      }, {});
+    }
+
+    return {
+      name: values[0] || '',
+      email: values[1] || '',
+      doc: values[2] || '',
+      role: values[3] || '',
+    };
+  });
+}
+
+function generateTempPassword() {
+  return `${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
+async function bulkCreateUsers(req, res, next) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'CSV file is required' });
+    }
+
+    const defaultRole = (req.body.defaultRole || 'user').toLowerCase();
+    if (!['admin', 'user'].includes(defaultRole)) {
+      return res.status(400).json({ message: 'defaultRole must be either admin or user' });
+    }
+
+    const fileText = require('fs').readFileSync(req.file.path, 'utf8');
+    const rows = parseCsvRows(fileText);
+
+    if (!rows.length) {
+      return res.status(400).json({ message: 'CSV file contains no rows' });
+    }
+
+    const createdUsers = [];
+    const errors = [];
+
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+      const row = rows[rowIndex];
+      const name = (row.name || '').trim();
+      const email = (row.email || '').trim().toLowerCase();
+      const role = (row.role || defaultRole || 'user').toLowerCase();
+      const documentPath = row.doc ? row.doc.trim() : undefined;
+
+      if (!name || !email) {
+        errors.push({ row: rowIndex + 1, message: 'Name and email are required' });
+        continue;
+      }
+
+      if (!['admin', 'user'].includes(role)) {
+        errors.push({ row: rowIndex + 1, message: 'Role must be admin or user' });
+        continue;
+      }
+
+      const tempPassword = generateTempPassword();
+      const user = new User({
+        name,
+        email,
+        role,
+        documentPath,
+        documentStatus: 'pending',
+        forcePasswordReset: true,
+      });
+      user.password = tempPassword;
+
+      try {
+        await user.save();
+        createdUsers.push({ email, role, tempPassword });
+      } catch (saveError) {
+        const message = saveError.code === 11000
+          ? 'Duplicate email or NID conflict'
+          : saveError.message;
+        errors.push({ row: rowIndex + 1, message });
+      }
+    }
+
+    res.json({
+      message: 'Bulk user import completed',
+      created: createdUsers,
+      errors,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 function runBenfordAnalysis(values) {
   const expected = {
     1: 30.1,
@@ -318,4 +418,5 @@ module.exports = {
   getElectionDemographics,
   getAreaVotingComparison,
   detectSuspiciousOutcomes,
+  bulkCreateUsers,
 };

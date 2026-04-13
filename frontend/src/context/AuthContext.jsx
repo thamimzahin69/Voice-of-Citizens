@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import apiClient from '../api/apiClient';
 
@@ -47,6 +48,19 @@ export function AuthProvider({ children }) {
     }
   }
 
+  async function completeProfile(formData) {
+    setLoading(true);
+    try {
+      const { data } = await apiClient.post('/auth/complete-profile', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setUser(data.user);
+      return data;
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function signOut() {
     setUser(null);
     setToken(null);
@@ -59,6 +73,7 @@ export function AuthProvider({ children }) {
     isAdmin,
     signIn,
     signUp,
+    completeProfile,
     signOut,
   };
 

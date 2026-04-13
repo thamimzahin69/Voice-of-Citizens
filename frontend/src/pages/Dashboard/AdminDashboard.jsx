@@ -13,7 +13,7 @@ export default function AdminDashboard() {
       try {
         const { data } = await apiClient.get('/elections');
         setElections(data);
-      } catch (err) {
+      } catch {
         setError('Unable to load elections.');
       } finally {
         setLoading(false);
@@ -33,6 +33,9 @@ export default function AdminDashboard() {
       <div className="page-actions">
         <Link to="create" className="btn">
           Create new election
+        </Link>
+        <Link to="bulk-users" className="btn secondary">
+          Bulk add users
         </Link>
       </div>
 

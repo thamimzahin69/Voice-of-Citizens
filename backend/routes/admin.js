@@ -1,4 +1,5 @@
 const express = require('express');
+const multer = require('multer');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const {
   listPendingVerifications,
@@ -8,12 +9,17 @@ const {
   getElectionDemographics,
   getAreaVotingComparison,
   detectSuspiciousOutcomes,
+  bulkCreateUsers,
 } = require('../controllers/adminController');
 
+const upload = multer({ dest: 'uploads/csv' });
 const router = express.Router();
 
 // All admin routes require authentication and admin role
 router.use(requireAuth, requireAdmin);
+
+// Bulk user administration
+router.post('/users/bulk', upload.single('file'), bulkCreateUsers);
 
 // Document Verification Routes
 router.get('/documents/pending', listPendingVerifications);

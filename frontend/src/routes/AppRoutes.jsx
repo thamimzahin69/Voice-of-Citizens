@@ -10,10 +10,12 @@ import SignUp from '../pages/Auth/SignUp';
 import Overview from '../pages/Dashboard/Overview';
 import AdminDashboard from '../pages/Dashboard/AdminDashboard';
 import AdminCreateElection from '../pages/Dashboard/AdminCreateElection';
+import BulkUserImport from '../pages/Dashboard/BulkUserImport';
 import JoinElection from '../pages/Dashboard/JoinElection';
 import ElectionHistory from '../pages/Dashboard/ElectionHistory';
 import Predictions from '../pages/Dashboard/Predictions';
 import ComplaintsPageContainer from '../pages/Dashboard/ComplaintsPageContainer';
+import CompleteProfile from '../pages/Auth/CompleteProfile';
 import ElectionDetails from '../pages/ElectionCenter/ElectionDetails'; // NEW
 import FAQ from '../pages/FAQ/FAQ';
 import Complaints from '../pages/Complaints/Complaints';
@@ -40,6 +42,8 @@ export default function AppRoutes() {
             <Route path="overview" element={<Overview />} />
             <Route path="admin" element={<AdminDashboard />} />
             <Route path="admin/create" element={<AdminCreateElection />} />
+            <Route path="admin/bulk-users" element={<BulkUserImport />} />
+            <Route path="complete-profile" element={<CompleteProfile />} />
             <Route path="join-election" element={<JoinElection />} />
             <Route path="history" element={<ElectionHistory />} />
             <Route path="predictions" element={<Predictions />} />

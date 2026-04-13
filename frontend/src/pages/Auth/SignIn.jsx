@@ -14,8 +14,12 @@ export default function SignIn() {
     event.preventDefault();
     setError(null);
     try {
-      await signIn(form);
-      navigate('/dashboard/overview');
+      const data = await signIn(form);
+      if (data?.mustResetPassword) {
+        navigate('/dashboard/complete-profile');
+      } else {
+        navigate('/dashboard/overview');
+      }
     } catch (err) {
       setError(err.response?.data?.message ?? 'Unable to sign in.');
     }

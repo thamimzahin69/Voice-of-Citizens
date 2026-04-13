@@ -62,7 +62,11 @@ async function register(req, res, next) {
     await user.save();
 
     const token = generateToken(user);
-    res.json({ user: user.toJSON(), token });
+    res.json({
+      user: user.toJSON(),
+      token,
+      mustResetPassword: Boolean(user.forcePasswordReset),
+    });
   } catch (err) {
     next(err);
   }
@@ -77,7 +81,50 @@ async function login(req, res, next) {
     }
 
     const token = generateToken(user);
-    res.json({ user: user.toJSON(), token });
+    res.json({
+      user: user.toJSON(),
+      token,
+      mustResetPassword: Boolean(user.forcePasswordReset),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function completeProfile(req, res, next) {
+  try {
+    const { password, nid } = req.body;
+
+    if (!password || !nid) {
+      return res.status(422).json({ message: 'Password and NID are required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(422).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const existingNid = await User.findOne({ nid, _id: { $ne: user._id } });
+    if (existingNid) {
+      return res.status(409).json({ message: 'NID already registered' });
+    }
+
+    user.password = password;
+    user.nid = nid;
+    user.forcePasswordReset = false;
+    user.documentStatus = 'pending';
+
+    if (req.file) {
+      user.documentPath = req.file.path;
+    }
+
+    await user.save();
+
+    res.json({ message: 'Profile completed successfully', user: user.toJSON() });
   } catch (err) {
     next(err);
   }
@@ -86,4 +133,5 @@ async function login(req, res, next) {
 module.exports = {
   register,
   login,
+  completeProfile,
 };

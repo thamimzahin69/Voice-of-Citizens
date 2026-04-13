@@ -8,8 +8,8 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ['admin', 'user'], default: 'user' },
-    // NID is now required and unique
-    nid: { type: String, required: true, unique: true, trim: true },
+    nid: { type: String, unique: true, sparse: true, trim: true },
+    forcePasswordReset: { type: Boolean, default: false },
     documentPath: { type: String },
     documentStatus: { type: String, enum: ['pending', 'verified', 'rejected'], default: 'pending' },
     documentVerifiedAt: { type: Date },
