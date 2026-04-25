@@ -10,6 +10,7 @@ import SignUp from '../pages/Auth/SignUp';
 import Overview from '../pages/Dashboard/Overview';
 import AdminDashboard from '../pages/Dashboard/AdminDashboard';
 import AdminCreateElection from '../pages/Dashboard/AdminCreateElection';
+import ApprovalRequests from '../pages/Dashboard/ApprovalRequests';
 import BulkUserImport from '../pages/Dashboard/BulkUserImport';
 import JoinElection from '../pages/Dashboard/JoinElection';
 import ElectionHistory from '../pages/Dashboard/ElectionHistory';
@@ -42,6 +43,7 @@ export default function AppRoutes() {
             <Route path="overview" element={<Overview />} />
             <Route path="admin" element={<AdminDashboard />} />
             <Route path="admin/create" element={<AdminCreateElection />} />
+            <Route path="admin/approvals" element={<ApprovalRequests />} />
             <Route path="admin/bulk-users" element={<BulkUserImport />} />
             <Route path="complete-profile" element={<CompleteProfile />} />
             <Route path="join-election" element={<JoinElection />} />

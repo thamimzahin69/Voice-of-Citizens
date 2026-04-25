@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const path = require('path');
 const User = require('../models/User');
 const { JWT_SECRET } = require('../middleware/auth');
 
@@ -51,21 +52,28 @@ async function register(req, res, next) {
     const existingUsers = await User.countDocuments();
     if (existingUsers === 0) {
       user.role = 'admin';
+      user.documentStatus = 'verified';
     }
 
     user.password = password;
 
     if (req.file) {
-      user.documentPath = req.file.path;
+      user.documentPath = path.basename(req.file.path);
     }
 
     await user.save();
 
-    const token = generateToken(user);
-    res.json({
-      user: user.toJSON(),
-      token,
-      mustResetPassword: Boolean(user.forcePasswordReset),
+    if (user.documentStatus === 'verified') {
+      const token = generateToken(user);
+      return res.json({
+        user: user.toJSON(),
+        token,
+        mustResetPassword: Boolean(user.forcePasswordReset),
+      });
+    }
+
+    return res.status(201).json({
+      message: 'Registration request submitted. Your account will be activated after admin approval.',
     });
   } catch (err) {
     next(err);
@@ -78,6 +86,13 @@ async function login(req, res, next) {
     const user = await User.findOne({ email });
     if (!user || !user.verifyPassword(password)) {
       return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    if (user.documentStatus !== 'verified' && user.role !== 'admin') {
+      const message = user.documentStatus === 'pending'
+        ? 'Account pending admin approval.'
+        : 'Registration rejected by admin.';
+      return res.status(403).json({ message });
     }
 
     const token = generateToken(user);
@@ -119,7 +134,7 @@ async function completeProfile(req, res, next) {
     user.documentStatus = 'pending';
 
     if (req.file) {
-      user.documentPath = req.file.path;
+      user.documentPath = path.basename(req.file.path);
     }
 
     await user.save();

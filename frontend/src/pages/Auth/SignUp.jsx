@@ -15,10 +15,12 @@ export default function SignUp() {
   });
   const [documentFile, setDocumentFile] = useState(null);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
 
   async function handleSubmit(event) {
     event.preventDefault();
     setError(null);
+    setSuccess(null);
 
     try {
       const data = new FormData();
@@ -28,8 +30,12 @@ export default function SignUp() {
       data.append('nid', form.nid);
       if (documentFile) data.append('document', documentFile);
 
-      await signUp(data);
-      navigate('/dashboard/overview');
+      const response = await signUp(data);
+      if (response.token) {
+        navigate('/dashboard/overview');
+      } else {
+        setSuccess('Registration request submitted. An admin will review your account shortly.');
+      }
     } catch (err) {
       setError(err.response?.data?.message ?? 'Unable to register.');
     }
@@ -79,6 +85,7 @@ export default function SignUp() {
           />
         </label>
         {error && <p className="form-error">{error}</p>}
+        {success && <p className="form-success">{success}</p>}
         <Button type="submit">Create account</Button>
       </form>
       <p className="hint">

@@ -77,7 +77,10 @@ async function bulkCreateUsers(req, res, next) {
         email,
         role,
         documentPath,
-        documentStatus: 'pending',
+        documentStatus: 'verified',
+        documentVerifiedAt: new Date(),
+        documentVerifiedBy: req.user._id,
+        importedByAdmin: true,
         forcePasswordReset: true,
       });
       user.password = tempPassword;
@@ -159,7 +162,7 @@ function runBenfordAnalysis(values) {
 // Document Verification
 async function listPendingVerifications(req, res, next) {
   try {
-    const pendingUsers = await User.find({ documentStatus: 'pending' }).select('-passwordHash -anonymousHash').sort({ createdAt: -1 });
+    const pendingUsers = await User.find({ documentStatus: 'pending', importedByAdmin: { $ne: true } }).select('-passwordHash -anonymousHash').sort({ createdAt: -1 });
     res.json(pendingUsers);
   } catch (err) {
     next(err);

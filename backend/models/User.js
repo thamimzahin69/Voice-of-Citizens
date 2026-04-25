@@ -14,6 +14,7 @@ const userSchema = new mongoose.Schema(
     documentStatus: { type: String, enum: ['pending', 'verified', 'rejected'], default: 'pending' },
     documentVerifiedAt: { type: Date },
     documentVerifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    importedByAdmin: { type: Boolean, default: false },
     age: { type: Number, min: 18, max: 120 },
     gender: { type: String, enum: ['male', 'female', 'other', ''] },
     address: { type: String, trim: true },
