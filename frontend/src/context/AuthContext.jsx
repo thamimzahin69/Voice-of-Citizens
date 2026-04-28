@@ -40,8 +40,10 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const { data } = await apiClient.post('/auth/register', signupData);
-      setUser(data.user);
-      setToken(data.token);
+      if (data.token) {
+        setUser(data.user);
+        setToken(data.token);
+      }
       return data;
     } finally {
       setLoading(false);

@@ -34,6 +34,9 @@ export default function AdminDashboard() {
         <Link to="create" className="btn">
           Create new election
         </Link>
+        <Link to="approvals" className="btn secondary">
+          Review user registrations
+        </Link>
         <Link to="bulk-users" className="btn secondary">
           Bulk add users
         </Link>

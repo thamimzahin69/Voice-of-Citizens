@@ -1,15 +1,25 @@
 import { useEffect, useState } from 'react';
 import apiClient from '../../api/apiClient';
+import { useAuth } from '../../context/AuthContext';
 import Card from '../../components/ui/Card';
 
 export default function Overview() {
+  const { isAdmin } = useAuth();
   const [stats, setStats] = useState(null);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
     async function load() {
       try {
-        const { data } = await apiClient.get('/dashboard/overview');
-        setStats(data);
+        const promises = [apiClient.get('/dashboard/overview')];
+        if (isAdmin) {
+          promises.push(apiClient.get('/admin/documents/pending'));
+        }
+        const [statsRes, pendingRes] = await Promise.all(promises);
+        setStats(statsRes.data);
+        if (pendingRes) {
+          setPendingCount(pendingRes.data.length);
+        }
       } catch (err) {
         console.error(err);
         setStats(null);
@@ -17,7 +27,7 @@ export default function Overview() {
     }
 
     load();
-  }, []);
+  }, [isAdmin]);
 
   const StatCard = ({ icon, title, value, color = 'primary-blue' }) => (
     <Card className="stat-card">
@@ -87,6 +97,13 @@ export default function Overview() {
           title="Open Complaints" 
           value={stats?.openComplaints ?? '—'}
         />
+        {isAdmin && (
+          <StatCard 
+            icon="📋" 
+            title="Pending Registrations" 
+            value={pendingCount}
+          />
+        )}
       </div>
 
       <div style={{ marginTop: '40px' }}>
