@@ -2,35 +2,59 @@ import { Link } from 'react-router-dom';
 
 const features = [
   {
-    slug: 'secure-voting',
-    title: 'Secure Voting Workflows',
-    description: 'Create elections, register voters, and conduct secure voting with role-based access.',
+    slug: 'secure-voter-registration',
+    icon: 'ID',
+    title: 'Secure Voter Registration',
+    description: 'Register with name, email, password, NID number, and uploaded NID document.',
   },
   {
-    slug: 'real-time-results',
-    title: 'Real-time Results',
-    description: 'View live vote tallies, historical turnout, and predicted outcomes.',
+    slug: 'digital-voting',
+    icon: 'Vote',
+    title: 'Digital Voting',
+    description: 'Eligible voters can join active elections and cast votes securely.',
   },
   {
-    slug: 'complaints',
+    slug: 'election-management',
+    icon: 'Admin',
+    title: 'Election Management',
+    description: 'Admins can create elections, manage candidates, and configure timelines.',
+  },
+  {
+    slug: 'complaint-system',
+    icon: 'Help',
     title: 'Citizen Complaints',
-    description: 'Track and manage complaints, and resolve issues with audit trails.',
+    description: 'Users submit complaints while admins review, respond, and resolve them.',
+  },
+  {
+    slug: 'voting-history',
+    icon: 'Log',
+    title: 'Voting History',
+    description: 'Citizens can review their past election participation without exposing vote choice.',
+  },
+  {
+    slug: 'admin-dashboard',
+    icon: 'Ops',
+    title: 'Admin Dashboard',
+    description: 'Admins monitor registrations, users, logs, complaints, and election activity.',
   },
 ];
 
 export default function FeatureSummary() {
   return (
-    <section id="features" className="feature-summary">
-      <h2>Key Features</h2>
-      <div className="feature-grid">
+    <section id="features" className="section">
+      <div className="section-header">
+        <p className="page-eyebrow">Platform Features</p>
+        <h2>Everything citizens and administrators need to run trusted elections.</h2>
+        <p>Clean workflows for registration, voting, oversight, complaints, and history.</p>
+      </div>
+      <div className="container feature-grid">
         {features.map((feature) => (
-          <article key={feature.slug} className="feature-card">
+          <Link key={feature.slug} to={`/features/${feature.slug}`} className="feature-card">
+            <span className="feature-icon">{feature.icon}</span>
             <h3>{feature.title}</h3>
             <p>{feature.description}</p>
-            <Link to={`/features/${feature.slug}`} className="link">
-              Learn more
-            </Link>
-          </article>
+            <span className="link">Learn more</span>
+          </Link>
         ))}
       </div>
     </section>

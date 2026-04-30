@@ -1,83 +1,53 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import apiClient from '../../api/apiClient';
+import Card from '../../components/ui/Card';
 
-export default function CandidateList() {
-  const { electionId } = useParams();
-  const navigate = useNavigate();
-  const [election, setElection] = useState(null);
-  const [joined, setJoined] = useState(false);
-  const [hasVoted, setHasVoted] = useState(false);
+export default function ElectionCenter() {
+  const [elections, setElections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [user, setUser] = useState(null); // from auth context ideally
-
-  // Fetch user from context (we'll assume you have useAuth)
-  // For brevity, we'll fetch election and status via API
 
   useEffect(() => {
     async function load() {
       try {
-        // Fetch election details and user status
-        const { data: electionData } = await apiClient.get(`/elections/${electionId}`);
-        const { data: statusData } = await apiClient.get(`/elections/${electionId}/status`); // new endpoint? simpler: we already have joinable endpoint but that's for list. We'll call a custom endpoint.
-        // Alternatively, we can use the same /joinable endpoint? Not efficient.
-        // Let's create a new endpoint: GET /api/elections/:id/status
-        // But to save time, we can just get user from AuthContext and check joined/voted via separate calls.
-        // I'll assume you have a way to get joined status from a backend call.
-        // For now, we'll fetch the election and then check if user id is in voters array (needs user object)
-      } catch (err) {
-        setError('Failed to load election');
+        const { data } = await apiClient.get('/elections');
+        setElections(data);
+      } catch {
+        setError('Failed to load elections.');
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, [electionId]);
-
-  // Simplified: We'll use a dedicated endpoint to get election with user status
-  // Instead of writing that, we'll modify the backend to return joined/hasVoted on GET /elections/:id
-  // Let's do that quickly in the backend.
-
-  // For now, assume we have:
-  // election = { title, description, endDate, voters, ... }
-  // joined = election.voters.includes(userId)
-  // hasVoted = already fetched
-
-  const handleJoin = async () => {
-    try {
-      await apiClient.post(`/elections/${electionId}/join`);
-      setJoined(true);
-    } catch (err) {
-      setError(err.response?.data?.msg || 'Join failed');
-    }
-  };
-
-  const handleVote = () => {
-    navigate(`/election/${electionId}/vote`);
-  };
-
-  if (loading) return <div>Loading...</div>;
+  }, []);
 
   return (
-    <div>
-      <h2>{election?.title}</h2>
-      <p>{election?.description}</p>
-      <p>Deadline: {new Date(election?.endDate).toLocaleString()}</p>
+    <section className="page">
+      <header className="page-header">
+        <p className="page-eyebrow">Election center</p>
+        <h1>Available Elections</h1>
+        <p>Review election windows, candidates, and voting availability.</p>
+      </header>
 
-      {error && <p className="error">{error}</p>}
+      {loading && <p className="empty-state">Loading elections...</p>}
+      {error && <p className="form-error">{error}</p>}
 
-      {!joined ? (
-        <button onClick={handleJoin} className="btn btn-primary">Join this Election</button>
-      ) : hasVoted ? (
-        <p>You have already voted in this election.</p>
-      ) : user?.documentStatus !== 'verified' ? (
-        <p className="warning">Your NID is not verified. Please verify your NID to vote.</p>
-      ) : (
-        <button onClick={handleVote} className="btn btn-success">Vote Now</button>
-      )}
-
-      {/* Candidate list can be shown regardless */}
-    </div>
+      <div className="grid">
+        {elections.length === 0 && !loading ? (
+          <p className="empty-state">No elections available right now.</p>
+        ) : (
+          elections.map((election) => (
+            <Card key={election._id} title={election.title}>
+              <p>{election.description || 'No description provided.'}</p>
+              <div className="card-actions">
+                <span className="badge badge-info">{election.status || 'Upcoming'}</span>
+                <Link className="btn" to={`/election/${election._id}`}>View Details</Link>
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
+    </section>
   );
 }

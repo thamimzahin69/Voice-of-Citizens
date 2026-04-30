@@ -1,180 +1,88 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import apiClient from '../api/apiClient';
+import Card from './ui/Card';
+
+function statusClass(status = '') {
+  const value = status.toLowerCase();
+  if (value.includes('resolved')) return 'badge-resolved';
+  if (value.includes('review')) return 'badge-review';
+  if (value.includes('reject')) return 'badge-rejected';
+  return 'badge-pending';
+}
 
 export default function AdminComplaints() {
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedId, setExpandedId] = useState(null);
+  const [filter, setFilter] = useState('all');
 
   useEffect(() => {
+    async function loadComplaints() {
+      try {
+        setLoading(true);
+        setError('');
+        const { data } = await apiClient.get('/complaints');
+        setComplaints(data);
+      } catch (err) {
+        setError(err.response?.data?.message || 'Failed to load complaints');
+      } finally {
+        setLoading(false);
+      }
+    }
     loadComplaints();
   }, []);
 
-  const loadComplaints = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      const { data } = await apiClient.get('/complaints');
-      setComplaints(data);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load complaints');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Pending':
-        return '#ffc107';
-      case 'Reviewed':
-        return '#17a2b8';
-      case 'Resolved':
-        return '#28a745';
-      default:
-        return '#6c757d';
-    }
-  };
-
-  if (loading) {
-    return <div style={{ padding: '20px', textAlign: 'center' }}>Loading complaints...</div>;
-  }
-
-  if (error) {
-    return <div style={{ padding: '20px', color: '#dc3545' }}>Error: {error}</div>;
-  }
+  const filtered = useMemo(() => {
+    if (filter === 'all') return complaints;
+    return complaints.filter((item) => (item.status || '').toLowerCase() === filter);
+  }, [complaints, filter]);
 
   return (
     <section className="page">
       <header className="page-header">
-        <h1>Complaints Management</h1>
-        <p>Review and manage all user complaints.</p>
+        <p className="page-eyebrow">Admin review</p>
+        <h1>Complaints</h1>
+        <p>View all complaints, filter by status, and open details for response workflows.</p>
       </header>
 
-      {complaints.length === 0 ? (
-        <div style={{
-          padding: '40px',
-          textAlign: 'center',
-          backgroundColor: '#f8f9fa',
-          borderRadius: '8px',
-          color: '#6c757d',
-        }}>
-          <p style={{ fontSize: '16px', margin: 0 }}>No complaints submitted yet.</p>
-        </div>
+      <Card>
+        <label className="form-field">
+          <span className="form-label">Filter complaints by status</span>
+          <select className="form-input" value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <option value="all">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="reviewed">In Review</option>
+            <option value="resolved">Resolved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </label>
+      </Card>
+
+      {loading && <p className="empty-state">Loading complaints...</p>}
+      {error && <p className="form-error">Error: {error}</p>}
+
+      {!loading && filtered.length === 0 ? (
+        <p className="empty-state">No complaints submitted yet.</p>
       ) : (
-        <div style={{
-          display: 'grid',
-          gap: '16px',
-        }}>
-          {complaints.map(complaint => (
-            <div
-              key={complaint._id}
-              style={{
-                padding: '20px',
-                border: '1px solid #ddd',
-                borderRadius: '8px',
-                backgroundColor: '#fff',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-              }}
-              onClick={() => setExpandedId(expandedId === complaint._id ? null : complaint._id)}
-              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)')}
-              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)')}
-            >
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'start',
-                marginBottom: '12px',
-              }}>
-                <div style={{ flex: 1 }}>
-                  <h3 style={{
-                    margin: '0 0 8px 0',
-                    fontSize: '18px',
-                    fontWeight: '600',
-                    color: '#333',
-                  }}>
-                    {complaint.subject}
-                  </h3>
-                  <p style={{
-                    margin: '0',
-                    fontSize: '14px',
-                    color: '#6c757d',
-                  }}>
-                    From: <strong>{complaint.submittedBy?.name || 'Anonymous'}</strong> ({complaint.submittedBy?.email})
-                  </p>
-                </div>
-                <div style={{
-                  display: 'flex',
-                  gap: '10px',
-                  alignItems: 'center',
-                }}>
-                  <span style={{
-                    padding: '6px 12px',
-                    backgroundColor: getStatusColor(complaint.status),
-                    color: 'white',
-                    borderRadius: '20px',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    whiteSpace: 'nowrap',
-                  }}>
-                    {complaint.status}
-                  </span>
-                  <span style={{
-                    fontSize: '20px',
-                    color: '#999',
-                  }}>
-                    {expandedId === complaint._id ? '▼' : '▶'}
-                  </span>
-                </div>
+        <div className="grid" style={{ marginTop: '18px' }}>
+          {filtered.map((complaint) => (
+            <Card key={complaint._id} title={complaint.subject || complaint.title || 'Complaint'}>
+              <div className="card-actions">
+                <span className={`badge ${statusClass(complaint.status)}`}>{complaint.status || 'Pending'}</span>
+                <button type="button" className="btn btn-secondary" onClick={() => setExpandedId(expandedId === complaint._id ? null : complaint._id)}>
+                  {expandedId === complaint._id ? 'Close details' : 'Open details'}
+                </button>
               </div>
-
-              {/* Expanded view */}
+              <p>From: <strong>{complaint.submittedBy?.name || 'Anonymous'}</strong> {complaint.submittedBy?.email ? `(${complaint.submittedBy.email})` : ''}</p>
               {expandedId === complaint._id && (
-                <div style={{
-                  marginTop: '16px',
-                  paddingTop: '16px',
-                  borderTop: '1px solid #eee',
-                }}>
-                  <div style={{
-                    marginBottom: '12px',
-                  }}>
-                    <h4 style={{
-                      margin: '0 0 8px 0',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: '#667eea',
-                    }}>
-                      Description:
-                    </h4>
-                    <p style={{
-                      margin: '0',
-                      color: '#555',
-                      lineHeight: '1.6',
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                    }}>
-                      {complaint.description}
-                    </p>
-                  </div>
-
-                  <div style={{
-                    display: 'flex',
-                    gap: '16px',
-                    fontSize: '12px',
-                    color: '#999',
-                  }}>
-                    <span>📅 Submitted: {new Date(complaint.createdAt).toLocaleString()}</span>
-                    {complaint.updatedAt !== complaint.createdAt && (
-                      <span>🔄 Updated: {new Date(complaint.updatedAt).toLocaleString()}</span>
-                    )}
-                  </div>
+                <div className="notice">
+                  <strong>Description</strong>
+                  <p>{complaint.description}</p>
+                  <small>Submitted: {complaint.createdAt ? new Date(complaint.createdAt).toLocaleString() : 'Not available'}</small>
                 </div>
               )}
-            </div>
+            </Card>
           ))}
         </div>
       )}

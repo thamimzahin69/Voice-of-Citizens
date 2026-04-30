@@ -3,7 +3,7 @@ import ComplaintForm from '../../components/ComplaintForm';
 import AdminComplaints from '../../components/AdminComplaints';
 
 export default function ComplaintsPageContainer() {
-  const { user, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
 
   return isAdmin ? <AdminComplaints /> : <ComplaintForm />;
 }

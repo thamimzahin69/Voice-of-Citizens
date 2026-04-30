@@ -16,6 +16,8 @@ import JoinElection from '../pages/Dashboard/JoinElection';
 import ElectionHistory from '../pages/Dashboard/ElectionHistory';
 import Predictions from '../pages/Dashboard/Predictions';
 import ComplaintsPageContainer from '../pages/Dashboard/ComplaintsPageContainer';
+import Chats from '../pages/Dashboard/Chats';
+import UserLog from '../pages/Dashboard/UserLog';
 import CompleteProfile from '../pages/Auth/CompleteProfile';
 import ElectionDetails from '../pages/ElectionCenter/ElectionDetails'; // NEW
 import FAQ from '../pages/FAQ/FAQ';
@@ -50,6 +52,8 @@ export default function AppRoutes() {
             <Route path="history" element={<ElectionHistory />} />
             <Route path="predictions" element={<Predictions />} />
             <Route path="complaints" element={<ComplaintsPageContainer />} />
+            <Route path="chats" element={<Chats />} />
+            <Route path="user-log" element={<UserLog />} />
           </Route>
 
           {/* Election Details – standalone */}

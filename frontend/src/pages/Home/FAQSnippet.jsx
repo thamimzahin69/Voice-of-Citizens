@@ -8,9 +8,12 @@ const faqs = [
 
 export default function FAQSnippet() {
   return (
-    <section className="faq-snippet">
-      <h2>Frequently Asked Questions</h2>
-      <div className="faq-grid">
+    <section className="section section-muted">
+      <div className="section-header">
+        <p className="page-eyebrow">FAQ</p>
+        <h2>Frequently Asked Questions</h2>
+      </div>
+      <div className="container faq-grid">
         {faqs.map((faq) => (
           <article key={faq.question} className="faq-card">
             <h4>{faq.question}</h4>
@@ -18,9 +21,9 @@ export default function FAQSnippet() {
           </article>
         ))}
       </div>
-      <Link to="/faq" className="link">
-        View all FAQs
-      </Link>
+      <div className="container" style={{ marginTop: '18px' }}>
+        <Link to="/faq" className="btn btn-secondary">View all FAQs</Link>
+      </div>
     </section>
   );
 }

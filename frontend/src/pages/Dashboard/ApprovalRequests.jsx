@@ -5,6 +5,9 @@ import Button from '../../components/ui/Button';
 
 export default function ApprovalRequests() {
   const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
 
   function getDocumentUrl(documentPath) {
     if (!documentPath) return null;
@@ -12,26 +15,6 @@ export default function ApprovalRequests() {
     const apiBase = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/api$/, '');
     return `${apiBase}/uploads/${fileName}`;
   }
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    async function loadRequestedUsers() {
-      setLoading(true);
-      setError(null);
-      try {
-        const { data } = await apiClient.get('/admin/documents/pending');
-        setRequests(data);
-      } catch (err) {
-        setError(err.response?.data?.message ?? 'Unable to load pending registration requests.');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadRequestedUsers();
-  }, []);
 
   async function refresh() {
     setLoading(true);
@@ -40,11 +23,15 @@ export default function ApprovalRequests() {
       const { data } = await apiClient.get('/admin/documents/pending');
       setRequests(data);
     } catch (err) {
-      setError(err.response?.data?.message ?? 'Unable to refresh requests.');
+      setError(err.response?.data?.message ?? 'Unable to load pending registration requests.');
     } finally {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    refresh();
+  }, []);
 
   async function handleApprove(userId) {
     setSubmitting(true);
@@ -61,9 +48,7 @@ export default function ApprovalRequests() {
 
   async function handleReject(userId) {
     const reason = window.prompt('Optional rejection reason:', 'Insufficient information');
-    if (reason === null) {
-      return;
-    }
+    if (reason === null) return;
 
     setSubmitting(true);
     setError(null);
@@ -80,39 +65,32 @@ export default function ApprovalRequests() {
   return (
     <section className="page">
       <header className="page-header">
-        <h1>User Registration Requests</h1>
-        <p>Review pending sign-up requests and approve or reject them.</p>
+        <p className="page-eyebrow">Identity review</p>
+        <h1>Review User Registration</h1>
+        <p>Review pending voter registrations, inspect NID documents, and approve or reject access.</p>
       </header>
 
-      {loading && <p>Loading registration requests…</p>}
+      {loading && <p className="empty-state">Loading registration requests...</p>}
       {error && <p className="form-error">{error}</p>}
-
-      {!loading && !requests.length && <p>No pending registration requests.</p>}
+      {!loading && !requests.length && <p className="empty-state">No pending registrations.</p>}
 
       <div className="grid">
         {requests.map((request) => (
           <Card key={request._id} title={request.name} className="request-card">
-            <p>
-              <strong>Email:</strong> {request.email}
-            </p>
-            <p>
-              <strong>NID:</strong> {request.nid || 'Not provided'}
-            </p>
-            {request.documentPath && (
-              <p>
-                <strong>NID Document:</strong>{' '}
-                <a href={getDocumentUrl(request.documentPath)} target="_blank" rel="noopener noreferrer">
-                  View/Download PDF
-                </a>
-              </p>
-            )}
+            <div className="detail-list">
+              <div className="detail-row"><span>Email</span><span>{request.email}</span></div>
+              <div className="detail-row"><span>NID number</span><span>{request.nid || 'Not provided'}</span></div>
+              <div className="detail-row"><span>Registration date</span><span>{request.createdAt ? new Date(request.createdAt).toLocaleDateString() : 'Not available'}</span></div>
+              <div className="detail-row"><span>Status</span><span className="badge badge-pending">Pending</span></div>
+            </div>
             <div className="card-actions">
-              <Button type="button" onClick={() => handleApprove(request._id)} disabled={submitting}>
-                Approve
-              </Button>
-              <Button type="button" className="secondary" onClick={() => handleReject(request._id)} disabled={submitting}>
-                Reject
-              </Button>
+              {request.documentPath && (
+                <a className="btn btn-secondary" href={getDocumentUrl(request.documentPath)} target="_blank" rel="noopener noreferrer">
+                  View document
+                </a>
+              )}
+              <Button type="button" onClick={() => handleApprove(request._id)} disabled={submitting}>Approve</Button>
+              <Button type="button" className="btn-danger" onClick={() => handleReject(request._id)} disabled={submitting}>Reject</Button>
             </div>
           </Card>
         ))}
