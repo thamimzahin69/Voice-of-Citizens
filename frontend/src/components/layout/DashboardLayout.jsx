@@ -4,24 +4,46 @@ import { useAuth } from '../../context/AuthContext';
 export default function DashboardLayout() {
   const { user, signOut, isAdmin } = useAuth();
 
+  const commonItems = [
+    { to: 'overview', label: 'Overview', icon: 'Dashboard' },
+    { to: 'join-election', label: 'Join Election', icon: 'Ballot' },
+    { to: 'history', label: 'History', icon: 'History' },
+    { to: 'complaints', label: 'Complaints', icon: 'Help' },
+    { to: 'chats', label: 'Chats', icon: 'Chat' },
+  ];
+
+  const adminItems = [
+    { to: 'overview', label: 'Overview', icon: 'Dashboard' },
+    { to: 'admin/create', label: 'Create Election', icon: 'Create' },
+    { to: 'join-election', label: 'Join Election', icon: 'Ballot' },
+    { to: 'history', label: 'History', icon: 'History' },
+    { to: 'admin/approvals', label: 'Review User Registration', icon: 'Review' },
+    { to: 'admin/bulk-users', label: 'Bulk Add User', icon: 'Import' },
+    { to: 'complaints', label: 'Complaints', icon: 'Help' },
+    { to: 'user-log', label: 'User Log', icon: 'Logs' },
+    { to: 'chats', label: 'Chats', icon: 'Chat' },
+  ];
+
+  const navItems = isAdmin ? adminItems : commonItems;
+
   return (
     <div className="dashboard">
       <aside className="dashboard-sidebar">
         <div className="sidebar-header">
-          <strong>Dashboard</strong>
+          <div className="sidebar-kicker">Voice of Citizens</div>
+          <strong className="brand-mark">Dashboard</strong>
           <div className="user-meta">
-            <span>{user?.name || user?.email}</span>
-            <span className="role">{isAdmin ? 'Admin' : 'Voter'}</span>
+            <strong>{user?.name || user?.email || 'Citizen'}</strong>
+            <span className="role">{isAdmin ? 'ADMIN' : 'USER'}</span>
           </div>
         </div>
         <nav className="dashboard-nav">
-          <NavLink to="overview">Overview</NavLink>
-          <NavLink to="create-election">Create Election</NavLink>
-          {isAdmin && <NavLink to="admin">Admin panel</NavLink>}
-          <NavLink to="join-election">Join Election</NavLink>
-          <NavLink to="history">History</NavLink>
-          <NavLink to="predictions">Predictions</NavLink>
-          <NavLink to="complaints">Complaints</NavLink>
+          {navItems.map((item) => (
+            <NavLink key={item.to} to={item.to}>
+              <span aria-hidden="true">{item.icon}</span>
+              {item.label}
+            </NavLink>
+          ))}
         </nav>
         <button type="button" className="sign-out" onClick={signOut}>
           Sign out

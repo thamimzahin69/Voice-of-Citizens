@@ -6,11 +6,12 @@ import Button from '../../components/ui/Button';
 
 export default function SignUp() {
   const navigate = useNavigate();
-  const { signUp } = useAuth();
+  const { signUp, loading } = useAuth();
   const [form, setForm] = useState({
     name: '',
     email: '',
     password: '',
+    confirmPassword: '',
     nid: '',
   });
   const [documentFile, setDocumentFile] = useState(null);
@@ -21,6 +22,11 @@ export default function SignUp() {
     event.preventDefault();
     setError(null);
     setSuccess(null);
+
+    if (form.password !== form.confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
 
     try {
       const data = new FormData();
@@ -41,56 +47,50 @@ export default function SignUp() {
     }
   }
 
+  const update = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
+
   return (
-    <main className="page auth-page">
-      <h1>Sign Up</h1>
-      <form className="auth-form" onSubmit={handleSubmit}>
-        <Input
-          label="Full Name"
-          name="name"
-          value={form.name}
-          onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-          required
-        />
-        <Input
-          label="Email"
-          name="email"
-          type="email"
-          value={form.email}
-          onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-          required
-        />
-        <Input
-          label="Password"
-          name="password"
-          type="password"
-          value={form.password}
-          onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-          required
-        />
-        <Input
-          label="National ID (NID)"
-          name="nid"
-          value={form.nid}
-          onChange={(e) => setForm((prev) => ({ ...prev, nid: e.target.value }))}
-          required
-        />
-        <label className="form-field">
-          <span className="form-label">Upload NID Document</span>
-          <input
-            type="file"
-            accept="image/*,application/pdf"
-            onChange={(e) => setDocumentFile(e.target.files?.[0] ?? null)}
-            className="form-input"
+    <main className="auth-page">
+      <section className="auth-card">
+        <p className="page-eyebrow">Voter registration</p>
+        <h1>Create your account</h1>
+        <p className="subtitle">
+          Your account may require admin approval before you can join elections or cast votes.
+        </p>
+
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <Input label="Full name" name="name" value={form.name} onChange={update('name')} required />
+          <Input label="Email" name="email" type="email" value={form.email} onChange={update('email')} required />
+          <Input label="Password" name="password" type="password" value={form.password} onChange={update('password')} required />
+          <Input
+            label="Confirm password"
+            name="confirmPassword"
+            type="password"
+            value={form.confirmPassword}
+            onChange={update('confirmPassword')}
+            required
           />
-        </label>
-        {error && <p className="form-error">{error}</p>}
-        {success && <p className="form-success">{success}</p>}
-        <Button type="submit">Create account</Button>
-      </form>
-      <p className="hint">
-        Already have an account? <Link to="/auth/sign-in">Sign in</Link>
-      </p>
+          <Input label="NID number" name="nid" value={form.nid} onChange={update('nid')} required />
+          <label className="form-field">
+            <span className="form-label">Upload NID Document</span>
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf"
+              onChange={(e) => setDocumentFile(e.target.files?.[0] ?? null)}
+              className="form-input"
+            />
+            <small className="text-gray-600">Accepted file types: PDF, JPG, PNG.</small>
+          </label>
+
+          {error && <p className="form-error">{error}</p>}
+          {success && <p className="form-success">{success}</p>}
+          <Button type="submit" disabled={loading}>{loading ? 'Creating account...' : 'Create Account'}</Button>
+        </form>
+
+        <p className="hint">
+          Already have an account? <Link to="/auth/sign-in" className="link">Sign in</Link>
+        </p>
+      </section>
     </main>
   );
 }

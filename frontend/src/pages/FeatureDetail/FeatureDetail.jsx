@@ -2,27 +2,40 @@ import { useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 
 const featureDetails = {
-  'secure-voting': {
-    title: 'Secure Voting Workflows',
-    description:
-      'Create elections, prepare voter rolls, and secure each vote with tokenized voting sessions. Administrators can define roles, manage election windows, and audit vote histories.',
-    highlights: [
-      'Role-based access (Admin / Voter)',
-      'Secure token-based voting links',
-      'Audit trail for every vote',
-    ],
+  overview: {
+    title: 'Platform Features',
+    description: 'Voice of Citizens combines voter registration, election operations, voting, complaints, and history in one clean civic dashboard.',
+    highlights: ['Secure voter registration', 'Digital voting workflows', 'Admin oversight tools'],
   },
-  'real-time-results': {
-    title: 'Real-time Results Dashboard',
-    description:
-      'See live updates as votes are tallied. Filter results by region, party, or candidate, and export reports for compliance and analysis.',
-    highlights: ['Live vote tally updates', 'Historical turnout charts', 'Export to CSV / PDF'],
+  'secure-voter-registration': {
+    title: 'Secure Voter Registration',
+    description: 'Citizens register with their basic identity details, NID number, and uploaded NID document for administrator review.',
+    highlights: ['NID document upload', 'Pending approval workflow', 'Role-based account access'],
   },
-  complaints: {
-    title: 'Complaint Tracking & Resolution',
-    description:
-      'Citizens can submit complaints about elections; admins can triage, comment, and resolve them while keeping stakeholders informed.',
-    highlights: ['Complaint statuses', 'Admin comment threads', 'Export history logs'],
+  'digital-voting': {
+    title: 'Digital Voting',
+    description: 'Eligible voters can join active elections, review candidate details, and cast a secure vote during the election window.',
+    highlights: ['Active election cards', 'Candidate review', 'Vote status tracking'],
+  },
+  'election-management': {
+    title: 'Election Management',
+    description: 'Administrators can create elections, configure timelines, add candidates, and monitor participation.',
+    highlights: ['Election creation form', 'Candidate information', 'Timeline configuration'],
+  },
+  'complaint-system': {
+    title: 'Complaint System',
+    description: 'Citizens can submit election-related issues while administrators review, triage, and respond.',
+    highlights: ['Complaint submission', 'Status badges', 'Admin review view'],
+  },
+  'voting-history': {
+    title: 'Voting History',
+    description: 'Users can see which elections they joined and whether they voted, without exposing private ballot choices.',
+    highlights: ['Participation history', 'Privacy-conscious status', 'Admin summaries'],
+  },
+  'admin-dashboard': {
+    title: 'Admin Dashboard',
+    description: 'A role-aware dashboard for reviewing registrations, bulk importing users, monitoring logs, and managing complaints.',
+    highlights: ['Registration review', 'Bulk user import', 'System activity overview'],
   },
 };
 
@@ -32,32 +45,35 @@ export default function FeatureDetail() {
 
   if (!feature) {
     return (
-      <main className="page">
+      <main className="page narrow-page">
         <h1>Feature not found</h1>
-        <p>We couldn’t find a feature with that identifier.</p>
-        <Link to="/">Return to Home</Link>
+        <p>We could not find a feature with that identifier.</p>
+        <Link to="/" className="btn btn-secondary">Return Home</Link>
       </main>
     );
   }
 
   return (
-    <main className="page">
+    <main className="page narrow-page">
       <header className="page-header">
+        <p className="page-eyebrow">Feature detail</p>
         <h1>{feature.title}</h1>
         <p>{feature.description}</p>
       </header>
-      <section className="feature-highlights">
+      <section className="card">
         <h2>Highlights</h2>
-        <ul>
+        <div className="grid">
           {feature.highlights.map((point) => (
-            <li key={point}>{point}</li>
+            <div key={point} className="mini-stat">
+              <span>{point}</span>
+              <strong>Ready</strong>
+            </div>
           ))}
-        </ul>
+        </div>
       </section>
-      <div className="page-actions">
-        <Link to="/auth/sign-up" className="btn">
-          Get Started
-        </Link>
+      <div className="page-actions" style={{ marginTop: '18px' }}>
+        <Link to="/auth/sign-up" className="btn">Get Started</Link>
+        <Link to="/" className="btn btn-secondary">Back to Home</Link>
       </div>
     </main>
   );
