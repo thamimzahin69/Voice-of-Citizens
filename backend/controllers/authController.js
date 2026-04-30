@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const path = require('path');
 const User = require('../models/User');
 const { JWT_SECRET } = require('../middleware/auth');
+const { recordActivityLog } = require('../services/activityLogService');
 
 function generateToken(user) {
   return jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
@@ -96,6 +97,15 @@ async function login(req, res, next) {
     }
 
     const token = generateToken(user);
+
+    recordActivityLog({
+      userId: user._id,
+      eventType: 'login',
+      action: 'Logged in',
+      details: `Signed in as ${user.email}`,
+      ipAddress: req.ip,
+    }).catch(() => null);
+
     res.json({
       user: user.toJSON(),
       token,

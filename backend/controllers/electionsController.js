@@ -4,6 +4,7 @@ const Election = require('../models/Election');
 const Candidate = require('../models/Candidate');
 const Vote = require('../models/Vote');
 const User = require('../models/User');
+const { recordActivityLog } = require('../services/activityLogService');
 
 // ==================== EXISTING FUNCTIONS (preserved) ====================
 
@@ -380,6 +381,15 @@ async function castVoteWithNid(req, res, next) {
 
     // Increment candidate vote count
     await Candidate.findByIdAndUpdate(candidateId, { $inc: { voteCount: 1 } });
+
+    recordActivityLog({
+      userId,
+      eventType: 'vote',
+      action: 'Cast vote',
+      details: `Voted in ${election.title || 'an election'} for ${candidate.name}`,
+      metadata: { electionId, candidateId },
+      ipAddress: req.ip,
+    }).catch(() => null);
 
     res.status(201).json({ message: 'Vote cast successfully', vote });
   } catch (err) {

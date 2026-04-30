@@ -4,7 +4,8 @@ import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 
 export default function Complaints() {
-  const [complaint, setComplaint] = useState('');
+  const [subject, setSubject] = useState('');
+  const [description, setDescription] = useState('');
   const [status, setStatus] = useState(null);
   const [history, setHistory] = useState([]);
 
@@ -23,10 +24,11 @@ export default function Complaints() {
   async function handleSubmit(event) {
     event.preventDefault();
     try {
-      const { data } = await apiClient.post('/complaints', { text: complaint });
+      const { data } = await apiClient.post('/complaints', { subject, description });
       setStatus({ type: 'success', text: 'Complaint submitted successfully.' });
       setHistory((prev) => [data, ...prev]);
-      setComplaint('');
+      setSubject('');
+      setDescription('');
     } catch (err) {
       setStatus({ type: 'error', text: err.response?.data?.message ?? 'Failed to submit complaint.' });
     }
@@ -41,15 +43,10 @@ export default function Complaints() {
 
       <section className="complaint-form">
         <form className="form-stack" onSubmit={handleSubmit}>
+          <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Brief title for the complaint" required label="Complaint title" />
           <label className="form-field">
             <span className="form-label">Describe your issue</span>
-            <textarea
-              value={complaint}
-              onChange={(e) => setComplaint(e.target.value)}
-              rows={4}
-              className="form-input"
-              required
-            />
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className="form-input" required />
           </label>
           <Button type="submit">Submit complaint</Button>
           {status && <p className={status.type === 'error' ? 'form-error' : 'form-success'}>{status.text}</p>}
