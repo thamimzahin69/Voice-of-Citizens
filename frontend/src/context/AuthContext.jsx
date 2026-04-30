@@ -63,7 +63,17 @@ export function AuthProvider({ children }) {
     }
   }
 
-  function signOut() {
+  async function signOut() {
+    try {
+      await apiClient.post('/activity-logs', {
+        eventType: 'logout',
+        action: 'Logged out',
+        details: 'Signed out from the application',
+      });
+    } catch {
+      // Keep logout reliable even if the audit write fails.
+    }
+
     setUser(null);
     setToken(null);
   }

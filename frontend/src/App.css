@@ -817,6 +817,13 @@ textarea.form-input {
   font-weight: 800;
 }
 
+.conversation small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
 .conversation.active {
   background: white;
   box-shadow: var(--shadow-soft);
@@ -828,11 +835,43 @@ textarea.form-input {
   padding: 18px;
 }
 
+.chat-status {
+  margin-bottom: 12px;
+}
+
+.new-chat-form {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border-radius: 18px;
+  background: white;
+  border: 1px solid var(--border);
+}
+
+.new-chat-form .btn {
+  width: 100%;
+}
+
+.chat-thread-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.chat-thread-header h2 {
+  margin: 0;
+}
+
 .message-list {
   flex: 1;
   display: grid;
   align-content: start;
   gap: 12px;
+  padding: 18px 0;
 }
 
 .message {
@@ -843,10 +882,31 @@ textarea.form-input {
   color: var(--text);
 }
 
+.message strong,
+.message span,
+.message small {
+  display: block;
+}
+
+.message strong {
+  margin-bottom: 4px;
+  font-size: 0.78rem;
+}
+
+.message small {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
 .message.mine {
   justify-self: end;
   background: var(--accent);
   color: white;
+}
+
+.message.mine small {
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .chat-input {
