@@ -33,6 +33,17 @@ function generateTempPassword() {
   return `${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
+async function getAllUsers(req, res, next) {
+  try {
+    const users = await User.find({ documentStatus: 'verified' })
+      .select('name email area role _id')
+      .sort({ name: 1 });
+    res.json(users);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function bulkCreateUsers(req, res, next) {
   try {
     if (!req.file) {
@@ -58,11 +69,12 @@ async function bulkCreateUsers(req, res, next) {
       const row = rows[rowIndex];
       const name = (row.name || '').trim();
       const email = (row.email || '').trim().toLowerCase();
+      const area = (row.area || '').trim();
       const role = (row.role || defaultRole || 'user').toLowerCase();
       const documentPath = row.doc ? row.doc.trim() : undefined;
 
-      if (!name || !email) {
-        errors.push({ row: rowIndex + 1, message: 'Name and email are required' });
+      if (!name || !email || !area) {
+        errors.push({ row: rowIndex + 1, message: 'Name, email, and area are required' });
         continue;
       }
 
@@ -75,6 +87,7 @@ async function bulkCreateUsers(req, res, next) {
       const user = new User({
         name,
         email,
+        area,
         role,
         documentPath,
         documentStatus: 'verified',
@@ -87,7 +100,7 @@ async function bulkCreateUsers(req, res, next) {
 
       try {
         await user.save();
-        createdUsers.push({ email, role, tempPassword });
+        createdUsers.push({ email, role, tempPassword, area });
       } catch (saveError) {
         const message = saveError.code === 11000
           ? 'Duplicate email or NID conflict'
@@ -422,4 +435,5 @@ module.exports = {
   getAreaVotingComparison,
   detectSuspiciousOutcomes,
   bulkCreateUsers,
+  getAllUsers,
 };

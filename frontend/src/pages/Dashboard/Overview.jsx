@@ -80,6 +80,7 @@ export default function Overview() {
               <div className="detail-row"><span>Full name</span><span>{user?.name || 'Not provided'}</span></div>
               <div className="detail-row"><span>Email</span><span>{user?.email || 'Not provided'}</span></div>
               <div className="detail-row"><span>NID number</span><span>{user?.nid || 'Not provided'}</span></div>
+              <div className="detail-row"><span>Area</span><span>{user?.area || 'Not provided'}</span></div>
               <div className="detail-row"><span>Role</span><span>{isAdmin ? 'Admin' : 'User'}</span></div>
               <div className="detail-row"><span>Registration status</span><span>{user?.status || user?.documentStatus || 'Active'}</span></div>
               <div className="detail-row"><span>Account created</span><span>{formatDate(user?.createdAt)}</span></div>

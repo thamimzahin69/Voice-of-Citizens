@@ -1,5 +1,6 @@
 // backend/controllers/electionsController.js
 
+const path = require('path');
 const Election = require('../models/Election');
 const Candidate = require('../models/Candidate');
 const Vote = require('../models/Vote');
@@ -10,15 +11,27 @@ const { recordActivityLog } = require('../services/activityLogService');
 
 async function createElection(req, res, next) {
   try {
-    const { type, title, description, startDate, endDate } = req.body;
+    const { type, title, description, startDate, endDate, votingType, area } = req.body;
+
+    // Validate voting type
+    if (!votingType || !['majority', 'rankBased'].includes(votingType)) {
+      return res.status(422).json({ message: 'Invalid votingType. Must be "majority" or "rankBased"' });
+    }
+
+    // Validate area
+    if (!area || typeof area !== 'string' || area.trim().length === 0) {
+      return res.status(422).json({ message: 'Area is required' });
+    }
 
     const election = await Election.create({
       type,
       title,
       description,
+      votingType,
+      area: area.trim(),
       startDate,
       endDate,
-      createdBy: "65f0a1b2c3d4e5f6a7b8c9d0", // or req.user._id
+      createdBy: req.user._id,
     });
 
     const candidatesPayload = req.body.candidates ? JSON.parse(req.body.candidates) : [];
@@ -36,7 +49,7 @@ async function createElection(req, res, next) {
 
       const file = files.shift();
       if (file) {
-        candidate.imagePath = file.path;
+        candidate.imagePath = file.filename;
       }
 
       await candidate.save();
@@ -61,7 +74,23 @@ async function getElection(req, res, next) {
 
 async function listAllElections(req, res, next) {
   try {
-    const elections = await Election.find().sort({ createdAt: -1 });
+    const user = req.user;
+    
+    // Admin can see all elections
+    if (user.role === 'admin') {
+      const elections = await Election.find().sort({ createdAt: -1 });
+      return res.json(elections);
+    }
+
+    // Regular users can see elections in their area or they are invited to
+    const query = {
+      $or: [
+        { area: user.area },
+        { invitedUsers: user._id }
+      ]
+    };
+    
+    const elections = await Election.find(query).sort({ createdAt: -1 });
     res.json(elections);
   } catch (err) {
     next(err);
@@ -70,8 +99,24 @@ async function listAllElections(req, res, next) {
 
 async function listActiveElections(req, res, next) {
   try {
+    const user = req.user;
     const now = new Date();
-    const elections = await Election.find({ startDate: { $lte: now }, endDate: { $gte: now } }).sort({ startDate: -1 });
+    
+    let query = {
+      startDate: { $lte: now },
+      endDate: { $gte: now }
+    };
+
+    // Admin can see all active elections
+    if (user.role !== 'admin') {
+      // Regular users can only see elections in their area or they are invited to
+      query.$or = [
+        { area: user.area },
+        { invitedUsers: user._id }
+      ];
+    }
+
+    const elections = await Election.find(query).sort({ startDate: -1 });
     res.json(elections);
   } catch (err) {
     next(err);
@@ -90,8 +135,42 @@ async function listHistory(req, res, next) {
 
 async function listCandidates(req, res, next) {
   try {
-    const candidates = await Candidate.find({ election: req.params.id });
-    res.json(candidates);
+    const electionId = req.params.id;
+    const user = req.user;
+
+    // Check if user can access this election
+    const election = await Election.findById(electionId);
+    if (!election) return res.status(404).json({ message: 'Election not found' });
+
+    if (user.role !== 'admin') {
+      const canAccess = election.area === user.area || election.invitedUsers.includes(user._id);
+      if (!canAccess) {
+        return res.status(403).json({ message: 'You are not eligible to view this election' });
+      }
+    }
+
+    const candidates = await Candidate.find({ election: electionId }).select(
+      'name party manifesto voteCount imagePath createdAt'
+    );
+
+    // Enhance candidate data with full profile information
+    const enhancedCandidates = candidates.map(candidate => {
+      const imageFileName = candidate.imagePath ? path.basename(candidate.imagePath) : null;
+      return {
+        _id: candidate._id,
+        name: candidate.name,
+        party: candidate.party || 'Independent',
+        manifesto: candidate.manifesto,
+        voteCount: candidate.voteCount,
+        imagePath: candidate.imagePath,
+        imageUrl: imageFileName ? `${req.protocol}://${req.get('host')}/uploads/candidates/${imageFileName}` : null,
+        joinedDate: candidate.createdAt,
+        electionId: electionId,
+        electionTitle: election.title,
+      };
+    });
+
+    res.json(enhancedCandidates);
   } catch (err) {
     next(err);
   }
@@ -99,7 +178,21 @@ async function listCandidates(req, res, next) {
 
 async function listManifestos(req, res, next) {
   try {
-    const candidates = await Candidate.find({ election: req.params.id });
+    const electionId = req.params.id;
+    const user = req.user;
+
+    // Check if user can access this election
+    const election = await Election.findById(electionId);
+    if (!election) return res.status(404).json({ message: 'Election not found' });
+
+    if (user.role !== 'admin') {
+      const canAccess = election.area === user.area || election.invitedUsers.includes(user._id);
+      if (!canAccess) {
+        return res.status(403).json({ message: 'You are not eligible to view this election' });
+      }
+    }
+
+    const candidates = await Candidate.find({ election: electionId });
     const manifestos = candidates.map((c) => ({
       _id: c._id,
       candidateName: c.name,
@@ -113,7 +206,21 @@ async function listManifestos(req, res, next) {
 
 async function results(req, res, next) {
   try {
-    const candidates = await Candidate.find({ election: req.params.id });
+    const electionId = req.params.id;
+    const user = req.user;
+
+    // Check if user can access this election
+    const election = await Election.findById(electionId);
+    if (!election) return res.status(404).json({ message: 'Election not found' });
+
+    if (user.role !== 'admin') {
+      const canAccess = election.area === user.area || election.invitedUsers.includes(user._id);
+      if (!canAccess) {
+        return res.status(403).json({ message: 'You are not eligible to view this election' });
+      }
+    }
+
+    const candidates = await Candidate.find({ election: electionId });
     const totalVotes = candidates.reduce((acc, c) => acc + (c.voteCount ?? 0), 0);
 
     const results = candidates.map((c) => ({
@@ -131,7 +238,24 @@ async function results(req, res, next) {
 
 async function predictions(req, res, next) {
   try {
-    const candidates = await Candidate.find();
+    const user = req.user;
+
+    // Get all elections user can access
+    let elections;
+    if (user.role === 'admin') {
+      elections = await Election.find();
+    } else {
+      elections = await Election.find({
+        $or: [
+          { area: user.area },
+          { invitedUsers: user._id }
+        ]
+      });
+    }
+
+    const electionIds = elections.map(e => e._id.toString());
+
+    const candidates = await Candidate.find({ election: { $in: electionIds } });
     const grouped = candidates.reduce((acc, c) => {
       const key = c.election.toString();
       acc[key] = acc[key] || { electionId: key, electionTitle: '', candidates: [] };
@@ -162,19 +286,30 @@ async function predictions(req, res, next) {
 
 async function getJoinableElections(req, res, next) {
   try {
-    const userId = req.user.id;
+    const user = req.user;
     const now = new Date();
 
-    const elections = await Election.find({
+    let query = {
       endDate: { $gt: now },
       isPublished: true,
-    }).select('title description startDate endDate');
+    };
 
-    const votes = await Vote.find({ voter: userId }).distinct('election');
+    // Admin can see all joinable elections
+    if (user.role !== 'admin') {
+      // Regular users can only see elections in their area or they are invited to
+      query.$or = [
+        { area: user.area },
+        { invitedUsers: user._id }
+      ];
+    }
+
+    const elections = await Election.find(query).select('title description startDate endDate votingType area');
+
+    const votes = await Vote.find({ voter: user._id }).distinct('election');
 
     const enriched = elections.map(election => ({
       ...election.toObject(),
-      joined: election.voters?.includes(userId) || false,
+      joined: election.voters?.includes(user._id) || false,
       hasVoted: votes.includes(election._id.toString()),
     }));
 
@@ -187,10 +322,19 @@ async function getJoinableElections(req, res, next) {
 async function joinElection(req, res, next) {
   try {
     const electionId = req.params.id;
-    const userId = req.user.id;
+    const user = req.user;
+    const userId = user.id;
 
     const election = await Election.findById(electionId);
     if (!election) return res.status(404).json({ msg: 'Election not found' });
+
+    // Check if user is allowed to join this election
+    if (user.role !== 'admin') {
+      const canAccess = election.area === user.area || election.invitedUsers.includes(user._id);
+      if (!canAccess) {
+        return res.status(403).json({ msg: 'You are not eligible to join this election' });
+      }
+    }
 
     const now = new Date();
     if (election.endDate <= now) {
@@ -222,13 +366,21 @@ async function joinElection(req, res, next) {
 async function getElectionStatus(req, res, next) {
   try {
     const electionId = req.params.id;
-    const userId = req.user.id;
+    const user = req.user;
 
     const election = await Election.findById(electionId);
     if (!election) return res.status(404).json({ msg: 'Election not found' });
 
-    const joined = election.voters?.includes(userId) || false;
-    const hasVoted = !!(await Vote.findOne({ election: electionId, voter: userId }));
+    // Check if user can access this election
+    if (user.role !== 'admin') {
+      const canAccess = election.area === user.area || election.invitedUsers.includes(user._id);
+      if (!canAccess) {
+        return res.status(403).json({ message: 'You are not eligible to view this election' });
+      }
+    }
+
+    const joined = election.voters?.includes(user._id) || false;
+    const hasVoted = !!(await Vote.findOne({ election: electionId, voter: user._id }));
 
     res.json({ joined, hasVoted });
   } catch (err) {
@@ -243,8 +395,23 @@ async function getElectionStatus(req, res, next) {
 // @access  Private
 async function getAllElections(req, res, next) {
   try {
-    const userId = req.user.id;
-    const elections = await Election.find().select('-__v').lean();
+    const user = req.user;
+    const userId = user.id;
+
+    let query = {};
+
+    // Admin can see all elections
+    if (user.role !== 'admin') {
+      // Regular users can only see elections in their area or they are invited to
+      query = {
+        $or: [
+          { area: user.area },
+          { invitedUsers: user._id }
+        ]
+      };
+    }
+
+    const elections = await Election.find(query).select('-__v').lean();
 
     const now = new Date();
     const enrichedElections = await Promise.all(elections.map(async (election) => {
@@ -275,10 +442,19 @@ async function getAllElections(req, res, next) {
 async function getElectionById(req, res, next) {
   try {
     const electionId = req.params.id;
-    const userId = req.user.id;
+    const user = req.user;
+    const userId = user.id;
 
     const election = await Election.findById(electionId).lean();
     if (!election) return res.status(404).json({ message: 'Election not found' });
+
+    // Check if user is allowed to view this election
+    if (user.role !== 'admin') {
+      const canAccess = election.area === user.area || election.invitedUsers.includes(user._id);
+      if (!canAccess) {
+        return res.status(403).json({ message: 'You are not eligible to view this election' });
+      }
+    }
 
     const now = new Date();
     let status = 'upcoming';
@@ -345,6 +521,14 @@ async function castVoteWithNid(req, res, next) {
     const election = await Election.findById(electionId);
     if (!election) return res.status(404).json({ message: 'Election not found' });
 
+    // Check if user is allowed to vote in this election
+    if (req.user.role !== 'admin') {
+      const canAccess = election.area === req.user.area || election.invitedUsers.includes(req.user._id);
+      if (!canAccess) {
+        return res.status(403).json({ message: 'You are not eligible to vote in this election' });
+      }
+    }
+
     const now = new Date();
     if (now < election.startDate) {
       return res.status(400).json({ message: 'Election has not started yet' });
@@ -397,6 +581,47 @@ async function castVoteWithNid(req, res, next) {
   }
 }
 
+// @desc    Invite users to an election (Admin only)
+// @route   POST /api/elections/:id/invite
+// @access  Private/Admin
+async function inviteUsersToElection(req, res, next) {
+  try {
+    const { electionId } = req.params;
+    const { userIds } = req.body;
+
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Only admins can invite users to elections' });
+    }
+
+    // Validate request
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(422).json({ message: 'userIds must be a non-empty array' });
+    }
+
+    const election = await Election.findById(electionId);
+    if (!election) {
+      return res.status(404).json({ message: 'Election not found' });
+    }
+
+    // Add users to invitedUsers array (avoiding duplicates)
+    const newInvites = userIds.filter(userId => !election.invitedUsers.includes(userId));
+    
+    if (newInvites.length > 0) {
+      election.invitedUsers.push(...newInvites);
+      await election.save();
+    }
+
+    res.json({
+      message: `${newInvites.length} user(s) invited successfully`,
+      invitedCount: newInvites.length,
+      election
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // Export all functions (replace old castVote with new one if desired, or keep both)
 module.exports = {
   createElection,
@@ -414,4 +639,5 @@ module.exports = {
   getElectionStatus,
   getAllElections,                // new
   getElectionById,               // new
+  inviteUsersToElection,         // new
 };

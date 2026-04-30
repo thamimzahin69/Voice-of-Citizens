@@ -20,6 +20,7 @@ import Chats from '../pages/Dashboard/Chats';
 import UserLog from '../pages/Dashboard/UserLog';
 import CompleteProfile from '../pages/Auth/CompleteProfile';
 import ElectionDetails from '../pages/ElectionCenter/ElectionDetails'; // NEW
+import CandidatesPage from '../pages/ElectionCenter/CandidatesPage'; // NEW
 import FAQ from '../pages/FAQ/FAQ';
 import Complaints from '../pages/Complaints/Complaints';
 import NotFound from '../pages/NotFound';
@@ -58,6 +59,7 @@ export default function AppRoutes() {
 
           {/* Election Details – standalone */}
           <Route path="/election/:id" element={<ElectionDetails />} />
+          <Route path="/election/:id/candidates" element={<CandidatesPage />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />

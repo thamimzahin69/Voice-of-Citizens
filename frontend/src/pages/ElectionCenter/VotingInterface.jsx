@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../../api/apiClient';
 import { useAuth } from '../../context/AuthContext';
 import VotingTimer from '../../components/election/VotingTimer';
+import './VotingInterface.css';
 
 export default function VotingInterface() {
   const { electionId } = useParams();
@@ -76,7 +77,7 @@ export default function VotingInterface() {
         <h2>Voting</h2>
         <p className="warning">
           You must join this election before voting. 
-          <button onClick={() => navigate(`/election/${electionId}/candidates`)}>
+          <button onClick={() => navigate(`/election/${electionId}`)}>
             Go to Election Page to Join
           </button>
         </p>
@@ -97,18 +98,43 @@ export default function VotingInterface() {
 
   return (
     <div className="voting-interface">
-      <VotingTimer />
+      <div className="voting-header">
+        <VotingTimer />
+        <button 
+          onClick={() => navigate(`/election/${electionId}/candidates`)}
+          className="btn btn-secondary view-candidates-btn"
+        >
+          View Detailed Candidate Profiles
+        </button>
+      </div>
       <h2>Cast Your Vote</h2>
       {error && <p className="error">{error}</p>}
       <ul className="candidates-list">
         {candidates.map(candidate => (
           <li key={candidate._id} className="candidate-item">
-            <strong>{candidate.name}</strong> ({candidate.party})
-            <p>{candidate.manifesto}</p>
-            <button 
-              onClick={() => handleVote(candidate._id)} 
+            <div className="candidate-header">
+              {candidate.imageUrl && (
+                <img
+                  src={candidate.imageUrl}
+                  alt={`${candidate.name} profile`}
+                  className="candidate-image"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+              )}
+              <div className="candidate-info">
+                <strong className="candidate-name">{candidate.name}</strong>
+                <span className="candidate-party">({candidate.party || 'Independent'})</span>
+              </div>
+            </div>
+            <div className="candidate-manifesto">
+              <p>{candidate.manifesto || 'No manifesto provided'}</p>
+            </div>
+            <button
+              onClick={() => handleVote(candidate._id)}
               disabled={voting}
-              className="btn btn-primary"
+              className="btn btn-primary vote-btn"
             >
               {voting ? 'Submitting...' : 'Vote'}
             </button>

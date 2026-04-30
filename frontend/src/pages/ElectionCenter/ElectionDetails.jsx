@@ -86,6 +86,14 @@ export default function ElectionDetails() {
           <span className={`badge ${statusClass(status)}`}>{status || 'Upcoming'}</span>
           {hasVoted && <span className="badge badge-voted">You have voted</span>}
           <span className="badge badge-info">{formatDate(startDate)} to {formatDate(endDate)}</span>
+          <button 
+            type="button" 
+            className="btn btn-primary" 
+            onClick={() => navigate(`/election/${id}/candidates`)}
+            style={{ marginLeft: 'auto' }}
+          >
+            View Candidates
+          </button>
         </div>
       </header>
 
@@ -105,7 +113,21 @@ export default function ElectionDetails() {
                 {leaderboard.map((candidate, idx) => (
                   <tr key={candidate._id}>
                     <td>#{idx + 1}</td>
-                    <td>{candidate.name}</td>
+                    <td>
+                      <div className="candidate-table-cell">
+                        {candidate.imageUrl && (
+                          <img
+                            src={candidate.imageUrl}
+                            alt={`${candidate.name} profile`}
+                            className="candidate-table-image"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                            }}
+                          />
+                        )}
+                        <span>{candidate.name}</span>
+                      </div>
+                    </td>
                     <td>{candidate.party || 'Independent'}</td>
                     <td>{candidate.votes ?? 0}</td>
                   </tr>

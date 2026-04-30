@@ -10,6 +10,7 @@ const {
   getAreaVotingComparison,
   detectSuspiciousOutcomes,
   bulkCreateUsers,
+  getAllUsers,
 } = require('../controllers/adminController');
 
 const upload = multer({ dest: 'uploads/csv' });
@@ -17,6 +18,9 @@ const router = express.Router();
 
 // All admin routes require authentication and admin role
 router.use(requireAuth, requireAdmin);
+
+// Get all verified users for inviting to elections
+router.get('/users', getAllUsers);
 
 // Bulk user administration
 router.post('/users/bulk', upload.single('file'), bulkCreateUsers);

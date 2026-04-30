@@ -13,6 +13,7 @@ export default function SignUp() {
     password: '',
     confirmPassword: '',
     nid: '',
+    area: '',
   });
   const [documentFile, setDocumentFile] = useState(null);
   const [error, setError] = useState(null);
@@ -34,6 +35,7 @@ export default function SignUp() {
       data.append('email', form.email);
       data.append('password', form.password);
       data.append('nid', form.nid);
+      data.append('area', form.area);
       if (documentFile) data.append('document', documentFile);
 
       const response = await signUp(data);
@@ -71,6 +73,7 @@ export default function SignUp() {
             required
           />
           <Input label="NID number" name="nid" value={form.nid} onChange={update('nid')} required />
+          <Input label="Area" name="area" value={form.area} onChange={update('area')} required placeholder="e.g., City, Region, District" />
           <label className="form-field">
             <span className="form-label">Upload NID Document</span>
             <input

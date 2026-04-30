@@ -14,6 +14,7 @@ const {
   getElectionStatus,
   getAllElections,
   getElectionById,
+  inviteUsersToElection,
 } = require('../controllers/electionsController');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 
@@ -26,6 +27,9 @@ router.get('/', requireAuth, getAllElections);
 
 // ========== Admin create election (require auth then admin) ==========
 router.post('/', requireAuth, requireAdmin, upload.array('candidateImages'), createElection);  // FIXED
+
+// ========== Admin invite users to election ==========
+router.post('/:id/invite', requireAuth, requireAdmin, inviteUsersToElection);
 
 // ========== Special category routes ==========
 router.get('/active', listActiveElections);

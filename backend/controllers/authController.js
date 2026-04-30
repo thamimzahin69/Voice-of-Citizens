@@ -10,11 +10,11 @@ function generateToken(user) {
 
 async function register(req, res, next) {
   try {
-    const { name, email, password, nid, age, gender, address, locality } = req.body;
+    const { name, email, password, nid, age, gender, address, locality, area } = req.body;
 
     // Basic validation
-    if (!name || !email || !password || !nid) {
-      return res.status(422).json({ message: 'All required fields must be filled' });
+    if (!name || !email || !password || !nid || !area) {
+      return res.status(422).json({ message: 'All required fields must be filled (name, email, password, nid, area)' });
     }
 
     if (password.length < 6) {
@@ -43,6 +43,7 @@ async function register(req, res, next) {
       name, 
       email, 
       nid,
+      area,
       age: age ? parseInt(age) : undefined,
       gender: gender || undefined,
       address: address || undefined,

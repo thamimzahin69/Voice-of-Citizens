@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema(
     gender: { type: String, enum: ['male', 'female', 'other', ''] },
     address: { type: String, trim: true },
     locality: { type: String, trim: true },
+    area: { type: String, required: true, trim: true },
     anonymousHash: { type: String, unique: true },
     joinedElections: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Election' }]
   },

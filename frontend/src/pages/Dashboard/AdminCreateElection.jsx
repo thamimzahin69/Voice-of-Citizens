@@ -11,6 +11,7 @@ const initialElection = {
   startDate: '',
   endDate: '',
   area: '',
+  votingType: 'majority',
   eligibilityRules: '',
   banner: null,
 };
@@ -48,10 +49,14 @@ export default function AdminCreateElection() {
 
     try {
       const formData = new FormData();
-      Object.entries(election).forEach(([key, value]) => {
-        if (key === 'banner' && value) formData.append('banner', value, value.name);
-        else if (key !== 'banner') formData.append(key, value);
+      // Only append fields that backend expects
+      const fieldsToSend = ['type', 'title', 'description', 'votingType', 'area', 'startDate', 'endDate'];
+      fieldsToSend.forEach((key) => {
+        if (election[key] !== null && election[key] !== undefined) {
+          formData.append(key, election[key]);
+        }
       });
+      
       formData.append('candidates', JSON.stringify(
         candidates.map((c) => ({ name: c.name, party: c.party, manifesto: c.manifesto })),
       ));
@@ -102,7 +107,14 @@ export default function AdminCreateElection() {
             </label>
             <Input label="Start date and time" type="datetime-local" value={election.startDate} onChange={(e) => updateElection('startDate', e.target.value)} required />
             <Input label="End date and time" type="datetime-local" value={election.endDate} onChange={(e) => updateElection('endDate', e.target.value)} required />
-            <Input label="Area / constituency" value={election.area} onChange={(e) => updateElection('area', e.target.value)} />
+            <Input label="Area / constituency" value={election.area} onChange={(e) => updateElection('area', e.target.value)} required />
+            <label className="form-field">
+              <span className="form-label">Voting Type</span>
+              <select value={election.votingType} onChange={(e) => updateElection('votingType', e.target.value)} className="form-input" required>
+                <option value="majority">Majority Voting</option>
+                <option value="rankBased">Rank Based Voting</option>
+              </select>
+            </label>
             <label className="form-field">
               <span className="form-label">Eligibility rules</span>
               <textarea
@@ -155,6 +167,7 @@ export default function AdminCreateElection() {
             <p><strong>Election:</strong> {election.title} ({election.type})</p>
             <p><strong>Window:</strong> {new Date(election.startDate).toLocaleString()} to {new Date(election.endDate).toLocaleString()}</p>
             <p><strong>Area:</strong> {election.area || 'Not specified'}</p>
+            <p><strong>Voting Type:</strong> {election.votingType === 'majority' ? 'Majority Voting' : 'Rank Based Voting'}</p>
             <p>{election.description}</p>
             <h3>Candidates</h3>
             <ul>
