@@ -26,6 +26,7 @@ export default function ElectionDetails() {
   const [voting, setVoting] = useState(false);
   const [nidInput, setNidInput] = useState('');
   const [selectedCandidate, setSelectedCandidate] = useState('');
+  const [rankedSelections, setRankedSelections] = useState([]);
   const [voteMessage, setVoteMessage] = useState('');
 
   const loadElection = useCallback(async () => {
@@ -47,18 +48,37 @@ export default function ElectionDetails() {
 
   async function handleVote(e) {
     e.preventDefault();
-    if (!selectedCandidate) {
-      setVoteMessage('Please select a candidate.');
-      return;
-    }
-    setVoting(true);
     setVoteMessage('');
+    setVoting(true);
     try {
-      await castVote(id, selectedCandidate, nidInput);
+      if (election.votingType === 'rankBased') {
+        const ranked = (rankedSelections || []).filter(Boolean);
+        if (ranked.length === 0) {
+          setVoteMessage('Please provide at least one ranked preference.');
+          setVoting(false);
+          return;
+        }
+        const uniqueRanked = Array.from(new Set(ranked));
+        if (uniqueRanked.length !== ranked.length) {
+          setVoteMessage('Each candidate may only appear once in your ranking.');
+          setVoting(false);
+          return;
+        }
+        await castVote(id, { ranked: uniqueRanked, nid: nidInput });
+      } else {
+        if (!selectedCandidate) {
+          setVoteMessage('Please select a candidate.');
+          setVoting(false);
+          return;
+        }
+        await castVote(id, { candidateId: selectedCandidate, nid: nidInput });
+      }
+
       setVoteMessage('Vote cast successfully.');
       await loadElection();
       setNidInput('');
       setSelectedCandidate('');
+      setRankedSelections([]);
     } catch (err) {
       setVoteMessage(err.response?.data?.message || 'Voting failed.');
     } finally {
@@ -69,8 +89,10 @@ export default function ElectionDetails() {
   if (loading) return <div className="text-center py-10">Loading election details...</div>;
   if (error || !election) return <div className="text-red-500 text-center py-10">{error || 'Election not found'}</div>;
 
-  const { status, hasVoted, candidates = [], leaderboard = candidates, winner, title, description, startDate, endDate } = election;
+  const { status, hasVoted, candidates = [], leaderboard = candidates, winner, title, description, startDate, endDate, rounds = 0 } = election;
   const isActive = status === 'active';
+  const irvRounds = election.roundResults || [];
+  const roundHeaders = Array.from({ length: rounds }, (_, idx) => `Round ${idx + 1}`);
 
   return (
     <main className="page">
@@ -106,7 +128,12 @@ export default function ElectionDetails() {
                   <th>Rank</th>
                   <th>Candidate</th>
                   <th>Party</th>
-                  <th>Votes</th>
+                  {election.votingType === 'rankBased' ? (
+                    roundHeaders.map((label) => <th key={label}>{label}</th>)
+                  ) : (
+                    <th>Votes</th>
+                  )}
+                  {election.votingType === 'rankBased' && <th>Status</th>}
                 </tr>
               </thead>
               <tbody>
@@ -129,7 +156,25 @@ export default function ElectionDetails() {
                       </div>
                     </td>
                     <td>{candidate.party || 'Independent'}</td>
-                    <td>{candidate.votes ?? 0}</td>
+                    {election.votingType === 'rankBased' ? (
+                      roundHeaders.map((_, roundIndex) => {
+                        const voteCount = candidate.roundVotes?.[roundIndex];
+                        return (
+                          <td key={roundIndex}>
+                            {typeof voteCount === 'number' ? voteCount : 'x'}
+                          </td>
+                        );
+                      })
+                    ) : (
+                      <td>{candidate.votes ?? 0}</td>
+                    )}
+                    {election.votingType === 'rankBased' && (
+                      <td>
+                        {candidate.eliminatedRound
+                          ? `Eliminated R${candidate.eliminatedRound}`
+                          : 'Winner'}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -142,15 +187,50 @@ export default function ElectionDetails() {
           <Card title="Cast Vote">
             <VotingTimer />
             <form className="form-stack" onSubmit={handleVote}>
-              <label className="form-field">
-                <span className="form-label">Select candidate</span>
-                <select className="form-input" value={selectedCandidate} onChange={(e) => setSelectedCandidate(e.target.value)} required>
-                  <option value="">Choose a candidate</option>
-                  {candidates.map((candidate) => (
-                    <option key={candidate._id} value={candidate._id}>{candidate.name} ({candidate.party || 'Independent'})</option>
-                  ))}
-                </select>
-              </label>
+                    {election.votingType === 'rankBased' ? (
+                      <div>
+                        <span className="form-label">Rank candidates (1 = top choice)</span>
+                        {Array.from({ length: candidates.length }).map((_, idx) => (
+                          <label className="form-field" key={idx}>
+                            <span className="form-label">Rank {idx + 1}</span>
+                            <select
+                              className="form-input"
+                              value={rankedSelections[idx] || ''}
+                              onChange={(e) => {
+                                const next = [...(rankedSelections || [])];
+                                next[idx] = e.target.value;
+                                setRankedSelections(next);
+                              }}
+                            >
+                              <option value="">-- Skip --</option>
+                              {candidates.map((candidate) => {
+                                const alreadySelected = rankedSelections.includes(candidate._id);
+                                const isCurrent = rankedSelections[idx] === candidate._id;
+                                return (
+                                  <option
+                                    key={candidate._id}
+                                    value={candidate._id}
+                                    disabled={alreadySelected && !isCurrent}
+                                  >
+                                    {candidate.name} ({candidate.party || 'Independent'})
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <label className="form-field">
+                        <span className="form-label">Select candidate</span>
+                        <select className="form-input" value={selectedCandidate} onChange={(e) => setSelectedCandidate(e.target.value)} required>
+                          <option value="">Choose a candidate</option>
+                          {candidates.map((candidate) => (
+                            <option key={candidate._id} value={candidate._id}>{candidate.name} ({candidate.party || 'Independent'})</option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
               <label className="form-field">
                 <span className="form-label">Your NID for verification</span>
                 <input className="form-input" value={nidInput} onChange={(e) => setNidInput(e.target.value)} required placeholder="Enter your NID number" />
