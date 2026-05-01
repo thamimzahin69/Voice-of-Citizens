@@ -7,6 +7,104 @@ const Vote = require('../models/Vote');
 const User = require('../models/User');
 const { recordActivityLog } = require('../services/activityLogService');
 
+function computeRankedElectionResults(candidateIds, ballots) {
+  const active = new Set(candidateIds);
+  const eliminatedRounds = {};
+  const candidateRoundCounts = candidateIds.reduce((acc, id) => ({ ...acc, [id]: [] }), {});
+  const rounds = [];
+  let round = 1;
+
+  while (true) {
+    const tally = {};
+    candidateIds.forEach((id) => {
+      if (active.has(id)) tally[id] = 0;
+    });
+
+    let activeBallots = 0;
+    ballots.forEach((ballot) => {
+      const choice = ballot.find((pref) => active.has(pref));
+      if (choice) {
+        tally[choice] = (tally[choice] || 0) + 1;
+        activeBallots += 1;
+      }
+    });
+
+    candidateIds.forEach((id) => {
+      candidateRoundCounts[id].push(active.has(id) ? tally[id] : null);
+    });
+
+    const roundData = {
+      round,
+      counts: { ...tally },
+      eliminated: [],
+      activeCandidates: Array.from(active),
+      activeBallots,
+    };
+
+    if (activeBallots > 0) {
+      for (const id of Object.keys(tally)) {
+        if (tally[id] > activeBallots / 2) {
+          const winnerId = id;
+          candidateIds.forEach((cid) => {
+            if (!eliminatedRounds[cid]) {
+              eliminatedRounds[cid] = cid === winnerId ? round + 1 : round;
+            }
+          });
+          rounds.push(roundData);
+          return {
+            candidateRoundCounts,
+            eliminatedRounds,
+            rounds,
+            winnerId,
+            totalRounds: round,
+          };
+        }
+      }
+    }
+
+    const entries = Object.entries(tally).filter(([id]) => active.has(id));
+    if (entries.length === 0) {
+      rounds.push(roundData);
+      return {
+        candidateRoundCounts,
+        eliminatedRounds,
+        rounds,
+        winnerId: null,
+        totalRounds: round,
+      };
+    }
+
+    let min = Infinity;
+    entries.forEach(([, count]) => {
+      if (count < min) min = count;
+    });
+
+    const toEliminate = entries.filter(([, count]) => count === min).map(([id]) => id);
+    toEliminate.forEach((cid) => {
+      active.delete(cid);
+      eliminatedRounds[cid] = round;
+    });
+    roundData.eliminated = toEliminate;
+    rounds.push(roundData);
+
+    if (active.size === 1) {
+      const winnerId = Array.from(active)[0];
+      candidateIds.forEach((cid) => {
+        if (!eliminatedRounds[cid]) eliminatedRounds[cid] = round + 1;
+      });
+      return {
+        candidateRoundCounts,
+        eliminatedRounds,
+        rounds,
+        winnerId,
+        totalRounds: round,
+      };
+    }
+
+    round += 1;
+  }
+}
+
 // ==================== EXISTING FUNCTIONS (preserved) ====================
 
 async function createElection(req, res, next) {
@@ -220,17 +318,67 @@ async function results(req, res, next) {
       }
     }
 
-    const candidates = await Candidate.find({ election: electionId });
-    const totalVotes = candidates.reduce((acc, c) => acc + (c.voteCount ?? 0), 0);
+    const candidates = await Candidate.find({ election: electionId }).lean();
 
-    const results = candidates.map((c) => ({
-      candidateId: c._id,
-      candidateName: c.name,
-      votes: c.voteCount ?? 0,
-      sharePercent: totalVotes ? ((c.voteCount ?? 0) / totalVotes) * 100 : 0,
-    }));
+    // Fetch raw votes for this election
+    const votes = await Vote.find({ election: electionId }).lean();
 
-    res.json(results);
+    if (election.votingType === 'majority') {
+      // Count single-choice votes
+      const counts = {};
+      candidates.forEach(c => { counts[c._id.toString()] = 0; });
+      votes.forEach(v => {
+        if (v.candidate) counts[v.candidate.toString()] = (counts[v.candidate.toString()] || 0) + 1;
+      });
+
+      const totalVotes = votes.filter(v => v.candidate).length;
+      const results = candidates.map((c) => ({
+        candidateId: c._id,
+        candidateName: c.name,
+        votes: counts[c._id.toString()] || 0,
+        sharePercent: totalVotes ? ((counts[c._id.toString()] || 0) / totalVotes) * 100 : 0,
+      }));
+
+      return res.json(results);
+    }
+
+    // Rank-based (IRV) counting
+    // Build ballots: prefer `ranked` array; fall back to single `candidate` if present
+    const ballots = votes.map(v => {
+      if (Array.isArray(v.ranked) && v.ranked.length > 0) return v.ranked.map(id => id.toString());
+      if (v.candidate) return [v.candidate.toString()];
+      return [];
+    }).filter(b => b.length > 0);
+
+    const candidateIds = candidates.map(c => c._id.toString());
+    const irv = computeRankedElectionResults(candidateIds, ballots);
+
+    const resultsData = candidates.map((c) => {
+      const id = c._id.toString();
+      const roundVotes = irv.candidateRoundCounts[id] || [];
+      return {
+        candidateId: c._id,
+        candidateName: c.name,
+        eliminatedRound: irv.eliminatedRounds[id] || null,
+        finalVotes: roundVotes[roundVotes.length - 1] || 0,
+        roundVotes,
+      };
+    });
+
+    const leaderboard = [...resultsData].sort((a, b) => {
+      const aSurvival = a.eliminatedRound || (irv.totalRounds + 1);
+      const bSurvival = b.eliminatedRound || (irv.totalRounds + 1);
+      if (aSurvival !== bSurvival) return bSurvival - aSurvival;
+      return (b.finalVotes || 0) - (a.finalVotes || 0);
+    });
+
+    return res.json({
+      results: resultsData,
+      leaderboard,
+      winnerId: irv.winnerId,
+      rounds: irv.totalRounds,
+      roundResults: irv.rounds,
+    });
   } catch (err) {
     next(err);
   }
@@ -461,27 +609,63 @@ async function getElectionById(req, res, next) {
     if (now >= election.startDate && now <= election.endDate) status = 'active';
     else if (now > election.endDate) status = 'finished';
 
-    // Get candidates with their vote counts
+    // Get candidates
     const candidates = await Candidate.find({ election: electionId }).lean();
-    const voteCounts = await Vote.aggregate([
-      { $match: { election: election._id } },
-      { $group: { _id: '$candidate', count: { $sum: 1 } } }
-    ]);
-    const voteMap = {};
-    voteCounts.forEach(v => { voteMap[v._id.toString()] = v.count; });
 
-    const candidatesWithVotes = candidates.map(c => ({
-      ...c,
-      votes: voteMap[c._id.toString()] || 0
-    }));
-
-    // Leaderboard sorted by votes desc
-    const leaderboard = [...candidatesWithVotes].sort((a, b) => b.votes - a.votes);
-
-    // Winner if finished
+    // Prepare response containers
+    let candidatesWithVotes = [];
+    let leaderboard = [];
     let winner = null;
-    if (status === 'finished' && leaderboard.length > 0) {
-      winner = leaderboard[0];
+
+    if (election.votingType === 'majority') {
+      // Count single-choice votes
+      const voteCounts = await Vote.aggregate([
+        { $match: { election: election._id, candidate: { $exists: true, $ne: null } } },
+        { $group: { _id: '$candidate', count: { $sum: 1 } } }
+      ]);
+      const voteMap = {};
+      voteCounts.forEach(v => { if (v._id) voteMap[v._id.toString()] = v.count; });
+
+      candidatesWithVotes = candidates.map(c => ({
+        ...c,
+        votes: voteMap[c._1?.toString?.() ?? c._id.toString()] || voteMap[c._id.toString()] || 0
+      }));
+
+      leaderboard = [...candidatesWithVotes].sort((a, b) => (b.votes || 0) - (a.votes || 0));
+      if (status === 'finished' && leaderboard.length > 0) winner = leaderboard[0];
+    } else {
+      // Rank-based (IRV)
+      const votes = await Vote.find({ election: election._id }).lean();
+      const ballots = votes.map(v => {
+        if (Array.isArray(v.ranked) && v.ranked.length > 0) return v.ranked.map(id => id.toString());
+        if (v.candidate) return [v.candidate.toString()];
+        return [];
+      }).filter(b => b.length > 0);
+
+      const candidateIds = candidates.map(c => c._id.toString());
+      const irv = computeRankedElectionResults(candidateIds, ballots);
+
+      candidatesWithVotes = candidates.map((c) => {
+        const id = c._id.toString();
+        const roundVotes = irv.candidateRoundCounts[id] || [];
+        return {
+          ...c,
+          eliminatedRound: irv.eliminatedRounds[id] || null,
+          roundVotes,
+          votes: roundVotes[roundVotes.length - 1] || 0,
+        };
+      });
+
+      leaderboard = [...candidatesWithVotes].sort((a, b) => {
+        const aSurvival = a.eliminatedRound || (irv.totalRounds + 1);
+        const bSurvival = b.eliminatedRound || (irv.totalRounds + 1);
+        if (aSurvival !== bSurvival) return bSurvival - aSurvival;
+        return (b.votes || 0) - (a.votes || 0);
+      });
+
+      if (status === 'finished' && leaderboard.length > 0) winner = leaderboard[0];
+      election.rounds = irv.totalRounds;
+      election.roundResults = irv.rounds;
     }
 
     const hasVoted = await Vote.exists({ voter: userId, election: election._id });
@@ -505,12 +689,10 @@ async function getElectionById(req, res, next) {
 async function castVoteWithNid(req, res, next) {
   try {
     const electionId = req.params.id;
-    const { candidateId, nid } = req.body;
+    const { candidateId, ranked, nid } = req.body;
     const userId = req.user.id;
 
-    if (!candidateId || !nid) {
-      return res.status(400).json({ message: 'Candidate ID and NID are required' });
-    }
+    if (!nid) return res.status(400).json({ message: 'NID is required' });
 
     // Verify NID matches the logged-in user
     const user = await User.findById(userId);
@@ -544,38 +726,72 @@ async function castVoteWithNid(req, res, next) {
 
     // Check duplicate vote
     const existingVote = await Vote.findOne({ election: electionId, voter: userId });
-    if (existingVote) {
-      return res.status(400).json({ message: 'You have already voted in this election' });
+    if (existingVote) return res.status(400).json({ message: 'You have already voted in this election' });
+
+    if (election.votingType === 'majority') {
+      // Majority voting expects a single candidateId
+      if (!candidateId) return res.status(400).json({ message: 'Candidate ID is required for majority voting' });
+      const candidate = await Candidate.findOne({ _id: candidateId, election: electionId });
+      if (!candidate) return res.status(400).json({ message: 'Invalid candidate for this election' });
+
+      const vote = await Vote.create({
+        election: electionId,
+        candidate: candidateId,
+        voter: userId,
+        anonymousHash: user.anonymousHash,
+        ipAddress: req.ip,
+      });
+
+      // Maintain legacy voteCount field for quick lookups
+      await Candidate.findByIdAndUpdate(candidateId, { $inc: { voteCount: 1 } });
+
+      recordActivityLog({
+        userId,
+        eventType: 'vote',
+        action: 'Cast vote',
+        details: `Voted in ${election.title || 'an election'} for ${candidate.name}`,
+        metadata: { electionId, candidateId },
+        ipAddress: req.ip,
+      }).catch(() => null);
+
+      return res.status(201).json({ message: 'Vote cast successfully', vote });
     }
 
-    // Verify candidate belongs to this election
-    const candidate = await Candidate.findOne({ _id: candidateId, election: electionId });
-    if (!candidate) {
-      return res.status(400).json({ message: 'Invalid candidate for this election' });
+    // Rank-based voting (IRV) expects a `ranked` array of candidate IDs
+    if (election.votingType === 'rankBased') {
+      if (!Array.isArray(ranked) || ranked.length === 0) return res.status(400).json({ message: 'Ranked preferences are required for rank-based voting' });
+
+      // Validate ranked candidate IDs belong to this election
+      const validIds = await Candidate.find({ election: electionId }).select('_id').lean();
+      const validSet = new Set(validIds.map(v => v._id.toString()));
+      const cleaned = ranked.map(id => id.toString()).filter(id => validSet.has(id));
+      if (cleaned.length === 0) return res.status(400).json({ message: 'No valid ranked candidates provided' });
+      const uniqueRanked = Array.from(new Set(cleaned));
+      if (uniqueRanked.length !== cleaned.length) {
+        return res.status(400).json({ message: 'Each candidate may only appear once in ranked preferences' });
+      }
+
+      const vote = await Vote.create({
+        election: electionId,
+        ranked: uniqueRanked,
+        voter: userId,
+        anonymousHash: user.anonymousHash,
+        ipAddress: req.ip,
+      });
+
+      recordActivityLog({
+        userId,
+        eventType: 'vote',
+        action: 'Cast ranked vote',
+        details: `Cast ranked vote in ${election.title || 'an election'}`,
+        metadata: { electionId, ranked: cleaned },
+        ipAddress: req.ip,
+      }).catch(() => null);
+
+      return res.status(201).json({ message: 'Ranked vote cast successfully', vote });
     }
 
-    // Create vote
-    const vote = await Vote.create({
-      election: electionId,
-      candidate: candidateId,
-      voter: userId,
-      anonymousHash: user.anonymousHash,
-      ipAddress: req.ip,
-    });
-
-    // Increment candidate vote count
-    await Candidate.findByIdAndUpdate(candidateId, { $inc: { voteCount: 1 } });
-
-    recordActivityLog({
-      userId,
-      eventType: 'vote',
-      action: 'Cast vote',
-      details: `Voted in ${election.title || 'an election'} for ${candidate.name}`,
-      metadata: { electionId, candidateId },
-      ipAddress: req.ip,
-    }).catch(() => null);
-
-    res.status(201).json({ message: 'Vote cast successfully', vote });
+    return res.status(400).json({ message: 'Unsupported voting type' });
   } catch (err) {
     next(err);
   }

@@ -22,8 +22,8 @@ apiClient.interceptors.request.use((config) => {
 // ========== Election APIs ==========
 export const fetchElections = () => apiClient.get('/elections');          // GET /api/elections (all, enriched)
 export const fetchElectionDetails = (id) => apiClient.get(`/elections/${id}`); // GET /api/elections/:id
-export const castVote = (electionId, candidateId, nid) => 
-  apiClient.post(`/elections/${electionId}/vote`, { candidateId, nid });
+export const castVote = (electionId, data) => 
+  apiClient.post(`/elections/${electionId}/vote`, data);
 
 // ========== Join Election APIs ==========
 export const fetchJoinableElections = () => apiClient.get('/elections/joinable');
