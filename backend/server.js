@@ -1,4 +1,5 @@
 ﻿const dns = require('dns'); // 👈 1. ADD THIS: Import the built-in DNS module
+const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const express = require('express');
@@ -65,9 +66,27 @@ app.get('/api/test', (req, res) => {
   });
 });
 
-// Catch-all route
+// API 404s should stay JSON errors instead of falling through to the frontend.
+app.use('/api', (req, res) => {
+  res.status(404).json({ message: `API route not found: ${req.originalUrl}` });
+});
+
+const frontendDistPath = path.join(__dirname, '..', 'frontend', 'dist');
+const frontendIndexPath = path.join(frontendDistPath, 'index.html');
+
+if (fs.existsSync(frontendIndexPath)) {
+  app.use(express.static(frontendDistPath));
+}
+
+// Catch-all route for client-side navigation in production builds.
 app.get('/{*splat}', (req, res) => {
-    res.sendFile(path.join(__dirname, 'client', 'build', 'index.html'));
+  if (fs.existsSync(frontendIndexPath)) {
+    return res.sendFile(frontendIndexPath);
+  }
+
+  return res.status(404).json({
+    message: 'Frontend build not found. Run the frontend dev server or build the frontend first.',
+  });
 });
 
 app.use(errorHandler);

@@ -12,6 +12,8 @@ const {
   getJoinableElections,
   joinElection,
   getElectionStatus,
+  getElectionTamperingStatus,
+  disableSuspiciousElection,
   getAllElections,
   getElectionById,
   inviteUsersToElection,
@@ -41,11 +43,13 @@ router.get('/joinable', requireAuth, getJoinableElections);
 router.post('/:id/join', requireAuth, joinElection);
 
 // ========== Dynamic ID routes ==========
-router.get('/:id', requireAuth, getElectionById);
 router.get('/:id/status', requireAuth, getElectionStatus);
+router.get('/:id/tampering-status', requireAuth, getElectionTamperingStatus);
+router.patch('/:id/disable-suspicious', requireAuth, requireAdmin, disableSuspiciousElection);
 router.get('/:id/candidates', requireAuth, listCandidates);
 router.get('/:id/manifestos', requireAuth, listManifestos);
 router.post('/:id/vote', requireAuth, castVote);
 router.get('/:id/results', requireAuth, results);
+router.get('/:id', requireAuth, getElectionById);
 
 module.exports = router;

@@ -6,6 +6,7 @@ const Candidate = require('../models/Candidate');
 const Vote = require('../models/Vote');
 const User = require('../models/User');
 const { recordActivityLog } = require('../services/activityLogService');
+const { analyzeSuspiciousOutcomes } = require('./adminController');
 
 function computeRankedElectionResults(candidateIds, ballots) {
   const active = new Set(candidateIds);
@@ -105,6 +106,41 @@ function computeRankedElectionResults(candidateIds, ballots) {
   }
 }
 
+async function buildElectionStatistics({ election, leaderboard, totalVotes, winner }) {
+  const numericTotalVotes = Number(totalVotes) || 0;
+  const invitedIds = Array.isArray(election.invitedUsers) ? election.invitedUsers : [];
+  const eligibleVoterCount = invitedIds.length > 0
+    ? new Set(invitedIds.map((id) => id.toString())).size
+    : await User.countDocuments({ area: election.area, role: 'user', documentStatus: 'verified' });
+
+  const candidates = (leaderboard || []).map((candidate, index) => {
+    const voteCount = candidate.votes ?? candidate.finalVotes ?? 0;
+    return {
+      candidateId: candidate._id,
+      candidateName: candidate.name,
+      party: candidate.party || 'Independent',
+      voteCount,
+      sharePercent: numericTotalVotes ? Number(((voteCount / numericTotalVotes) * 100).toFixed(2)) : 0,
+      rank: index + 1,
+    };
+  });
+
+  const leader = winner || candidates[0] || null;
+
+  return {
+    totalVotes: numericTotalVotes,
+    eligibleVoterCount: eligibleVoterCount || null,
+    turnoutPercent: eligibleVoterCount ? Number(((numericTotalVotes / eligibleVoterCount) * 100).toFixed(2)) : null,
+    candidates,
+    leadingCandidate: leader ? {
+      candidateId: leader._id || leader.candidateId,
+      candidateName: leader.name || leader.candidateName,
+      party: leader.party || 'Independent',
+      voteCount: leader.votes ?? leader.finalVotes ?? leader.voteCount ?? 0,
+    } : null,
+  };
+}
+
 // ==================== EXISTING FUNCTIONS (preserved) ====================
 
 async function createElection(req, res, next) {
@@ -202,7 +238,8 @@ async function listActiveElections(req, res, next) {
     
     let query = {
       startDate: { $lte: now },
-      endDate: { $gte: now }
+      endDate: { $gte: now },
+      isPublished: true,
     };
 
     // Admin can see all active elections
@@ -536,6 +573,61 @@ async function getElectionStatus(req, res, next) {
   }
 }
 
+async function getElectionTamperingStatus(req, res, next) {
+  try {
+    const electionId = req.params.id;
+    const user = req.user;
+
+    const election = await Election.findById(electionId).lean();
+    if (!election) return res.status(404).json({ message: 'Election not found' });
+
+    if (user.role !== 'admin') {
+      const canAccess = election.area === user.area || election.invitedUsers.some((id) => id.toString() === user._id.toString());
+      if (!canAccess) {
+        return res.status(403).json({ message: 'You are not eligible to view this election' });
+      }
+    }
+
+    const analysis = await analyzeSuspiciousOutcomes(electionId);
+    res.json({
+      ...analysis,
+      electionDisabled: election.isPublished === false,
+      explanation: analysis.message || (
+        analysis.isSuspicious
+          ? 'Vote distribution exceeded the configured anomaly checks.'
+          : 'Vote distribution is within the configured anomaly checks.'
+      ),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function disableSuspiciousElection(req, res, next) {
+  try {
+    const electionId = req.params.id;
+    const election = await Election.findById(electionId);
+    if (!election) return res.status(404).json({ message: 'Election not found' });
+
+    const analysis = await analyzeSuspiciousOutcomes(electionId);
+    if (!analysis.isSuspicious) {
+      return res.status(400).json({ message: 'Election is not marked suspicious and cannot be disabled from this action.' });
+    }
+
+    election.isPublished = false;
+    await election.save();
+
+    res.json({
+      message: 'Election disabled because it was marked suspicious.',
+      electionId,
+      electionDisabled: true,
+      tamperingStatus: analysis,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ==================== NEW FUNCTIONS FOR REQUIREMENT ====================
 
 // @desc    Get all elections for logged-in user (enriched with status, hasVoted, candidateCount)
@@ -564,7 +656,8 @@ async function getAllElections(req, res, next) {
     const now = new Date();
     const enrichedElections = await Promise.all(elections.map(async (election) => {
       let status = 'upcoming';
-      if (now >= election.startDate && now <= election.endDate) status = 'active';
+      if (election.isPublished === false) status = 'disabled';
+      else if (now >= election.startDate && now <= election.endDate) status = 'active';
       else if (now > election.endDate) status = 'finished';
 
       const hasVoted = await Vote.exists({ voter: userId, election: election._id });
@@ -606,7 +699,8 @@ async function getElectionById(req, res, next) {
 
     const now = new Date();
     let status = 'upcoming';
-    if (now >= election.startDate && now <= election.endDate) status = 'active';
+    if (election.isPublished === false) status = 'disabled';
+    else if (now >= election.startDate && now <= election.endDate) status = 'active';
     else if (now > election.endDate) status = 'finished';
 
     // Get candidates
@@ -616,6 +710,7 @@ async function getElectionById(req, res, next) {
     let candidatesWithVotes = [];
     let leaderboard = [];
     let winner = null;
+    let totalVotes = 0;
 
     if (election.votingType === 'majority') {
       // Count single-choice votes
@@ -633,6 +728,7 @@ async function getElectionById(req, res, next) {
 
       leaderboard = [...candidatesWithVotes].sort((a, b) => (b.votes || 0) - (a.votes || 0));
       if (status === 'finished' && leaderboard.length > 0) winner = leaderboard[0];
+      totalVotes = candidatesWithVotes.reduce((sum, candidate) => sum + (candidate.votes || 0), 0);
     } else {
       // Rank-based (IRV)
       const votes = await Vote.find({ election: election._id }).lean();
@@ -666,9 +762,16 @@ async function getElectionById(req, res, next) {
       if (status === 'finished' && leaderboard.length > 0) winner = leaderboard[0];
       election.rounds = irv.totalRounds;
       election.roundResults = irv.rounds;
+      totalVotes = ballots.length;
     }
 
     const hasVoted = await Vote.exists({ voter: userId, election: election._id });
+    const statistics = await buildElectionStatistics({
+      election,
+      leaderboard,
+      totalVotes,
+      winner: winner || leaderboard[0],
+    });
 
     res.json({
       ...election,
@@ -676,7 +779,8 @@ async function getElectionById(req, res, next) {
       hasVoted: !!hasVoted,
       candidates: candidatesWithVotes,
       leaderboard,
-      winner
+      winner,
+      statistics,
     });
   } catch (err) {
     next(err);
@@ -702,6 +806,9 @@ async function castVoteWithNid(req, res, next) {
 
     const election = await Election.findById(electionId);
     if (!election) return res.status(404).json({ message: 'Election not found' });
+    if (election.isPublished === false) {
+      return res.status(400).json({ message: 'This election is disabled and no longer accepts votes' });
+    }
 
     // Check if user is allowed to vote in this election
     if (req.user.role !== 'admin') {
@@ -853,6 +960,8 @@ module.exports = {
   getJoinableElections,
   joinElection,
   getElectionStatus,
+  getElectionTamperingStatus,
+  disableSuspiciousElection,
   getAllElections,                // new
   getElectionById,               // new
   inviteUsersToElection,         // new

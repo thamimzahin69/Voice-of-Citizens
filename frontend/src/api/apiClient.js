@@ -22,6 +22,8 @@ apiClient.interceptors.request.use((config) => {
 // ========== Election APIs ==========
 export const fetchElections = () => apiClient.get('/elections');          // GET /api/elections (all, enriched)
 export const fetchElectionDetails = (id) => apiClient.get(`/elections/${id}`); // GET /api/elections/:id
+export const fetchElectionTamperingStatus = (id) => apiClient.get(`/elections/${id}/tampering-status`);
+export const disableSuspiciousElection = (id) => apiClient.patch(`/elections/${id}/disable-suspicious`);
 export const castVote = (electionId, data) => 
   apiClient.post(`/elections/${electionId}/vote`, data);
 

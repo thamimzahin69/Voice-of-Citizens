@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchElectionDetails, castVote } from '../../api/apiClient';
+import { castVote, disableSuspiciousElection, fetchElectionDetails, fetchElectionTamperingStatus } from '../../api/apiClient';
 import Card from '../../components/ui/Card';
 import VotingTimer from '../../components/election/VotingTimer';
 import VoterBadge from '../../components/election/VoterBadge';
+import { useAuth } from '../../context/AuthContext';
 
 function formatDate(date) {
   if (!date) return 'Not available';
@@ -14,15 +15,58 @@ function formatDate(date) {
 function statusClass(status) {
   if (status === 'active') return 'badge-active';
   if (status === 'finished' || status === 'closed') return 'badge-finished';
+  if (status === 'disabled') return 'badge-rejected';
   return 'badge-upcoming';
+}
+
+function formatMetric(value) {
+  if (value === undefined || value === null || value === '') return 'Not available';
+  return value;
+}
+
+function formatPercent(value) {
+  if (value === undefined || value === null || Number.isNaN(Number(value))) return 'Not available';
+  return `${Number(value).toFixed(1)}%`;
+}
+
+function buildStatisticsFallback(election) {
+  const rankedCandidates = [...(election.leaderboard || election.candidates || [])].map((candidate, index) => {
+    const voteCount = candidate.votes ?? candidate.finalVotes ?? 0;
+    return {
+      candidateId: candidate._id,
+      candidateName: candidate.name,
+      party: candidate.party || 'Independent',
+      voteCount,
+      rank: index + 1,
+      sharePercent: 0,
+    };
+  });
+  const totalVotes = rankedCandidates.reduce((sum, candidate) => sum + (candidate.voteCount || 0), 0);
+
+  return {
+    totalVotes,
+    eligibleVoterCount: null,
+    turnoutPercent: null,
+    candidates: rankedCandidates.map((candidate) => ({
+      ...candidate,
+      sharePercent: totalVotes ? Number(((candidate.voteCount / totalVotes) * 100).toFixed(2)) : 0,
+    })),
+    leadingCandidate: rankedCandidates[0] || null,
+  };
 }
 
 export default function ElectionDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [election, setElection] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [tamperingStatus, setTamperingStatus] = useState(null);
+  const [tamperingLoading, setTamperingLoading] = useState(true);
+  const [tamperingError, setTamperingError] = useState('');
+  const [disableLoading, setDisableLoading] = useState(false);
+  const [disableMessage, setDisableMessage] = useState('');
   const [voting, setVoting] = useState(false);
   const [nidInput, setNidInput] = useState('');
   const [selectedCandidate, setSelectedCandidate] = useState('');
@@ -45,6 +89,37 @@ export default function ElectionDetails() {
   useEffect(() => {
     loadElection();
   }, [loadElection]);
+
+  const loadTamperingStatus = useCallback(async () => {
+    try {
+      setTamperingLoading(true);
+      const res = await fetchElectionTamperingStatus(id);
+      setTamperingStatus(res.data);
+      setTamperingError('');
+    } catch (err) {
+      setTamperingError(err.response?.data?.message || 'Could not load tampering status');
+    } finally {
+      setTamperingLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    loadTamperingStatus();
+  }, [loadTamperingStatus]);
+
+  async function handleDisableSuspiciousElection() {
+    setDisableMessage('');
+    setDisableLoading(true);
+    try {
+      const res = await disableSuspiciousElection(id);
+      setDisableMessage(res.data?.message || 'Election disabled.');
+      await Promise.all([loadElection(), loadTamperingStatus()]);
+    } catch (err) {
+      setDisableMessage(err.response?.data?.message || 'Could not disable election.');
+    } finally {
+      setDisableLoading(false);
+    }
+  }
 
   async function handleVote(e) {
     e.preventDefault();
@@ -91,8 +166,13 @@ export default function ElectionDetails() {
 
   const { status, hasVoted, candidates = [], leaderboard = candidates, winner, title, description, startDate, endDate, rounds = 0 } = election;
   const isActive = status === 'active';
-  const irvRounds = election.roundResults || [];
   const roundHeaders = Array.from({ length: rounds }, (_, idx) => `Round ${idx + 1}`);
+  const isSuspicious = tamperingStatus?.isSuspicious || tamperingStatus?.suspicious;
+  const suspiciousCandidates = tamperingStatus?.suspiciousCandidates || [];
+  const statistics = election.statistics || buildStatisticsFallback(election);
+  const rankedStats = statistics.candidates || [];
+  const maxCandidateVotes = Math.max(...rankedStats.map((candidate) => candidate.voteCount || 0), 0);
+  const leaderLabel = status === 'finished' ? 'Winner' : 'Leading candidate';
 
   return (
     <main className="page">
@@ -118,6 +198,170 @@ export default function ElectionDetails() {
           </button>
         </div>
       </header>
+
+      <Card title="Tampering status" className={isSuspicious ? 'tampering-card tampering-card-alert' : 'tampering-card'}>
+        {tamperingLoading && <p className="empty-state">Checking election integrity...</p>}
+        {!tamperingLoading && tamperingError && <p className="form-error">{tamperingError}</p>}
+        {!tamperingLoading && !tamperingError && !tamperingStatus && (
+          <p className="empty-state">No tampering analysis is available for this election.</p>
+        )}
+        {!tamperingLoading && !tamperingError && tamperingStatus && (
+          <div className="tampering-panel">
+            <div className="tampering-summary">
+              <span className={`badge ${isSuspicious ? 'badge-rejected' : 'badge-approved'}`}>
+                {isSuspicious ? 'Potentially tampered' : 'Appears normal'}
+              </span>
+              <p>{tamperingStatus.explanation || tamperingStatus.message || 'Analysis completed.'}</p>
+            </div>
+
+            <div className="stat-grid tampering-metrics">
+              <div className="stat-card">
+                <span className="stat-label">Standard deviation</span>
+                <strong className="stat-value">{formatMetric(tamperingStatus.standardDeviation)}</strong>
+              </div>
+              <div className="stat-card">
+                <span className="stat-label">Threshold</span>
+                <strong className="stat-value">{formatMetric(tamperingStatus.threshold)}</strong>
+              </div>
+              <div className="stat-card">
+                <span className="stat-label">Total votes</span>
+                <strong className="stat-value">{formatMetric(tamperingStatus.totalVotes)}</strong>
+              </div>
+              <div className="stat-card">
+                <span className="stat-label">Suspicious candidates</span>
+                <strong className="stat-value">{formatMetric(tamperingStatus.suspiciousCount ?? suspiciousCandidates.length)}</strong>
+              </div>
+            </div>
+
+            {suspiciousCandidates.length > 0 ? (
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Candidate</th>
+                      <th>Votes</th>
+                      <th>Z-score</th>
+                      <th>Deviation</th>
+                      <th>Alert</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {suspiciousCandidates.map((candidate) => (
+                      <tr key={`${candidate.candidate}-${candidate.alert}`}>
+                        <td>{candidate.candidate}</td>
+                        <td>{candidate.votes}</td>
+                        <td>{candidate.zScore}</td>
+                        <td>{candidate.deviations}</td>
+                        <td>{candidate.alert}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="empty-state">
+                {tamperingStatus.message || 'No suspicious candidates were reported by the backend.'}
+              </p>
+            )}
+
+            {tamperingStatus.benford && (
+              <p className="tampering-note">
+                Benford signal: {tamperingStatus.benford.signal}
+                {tamperingStatus.benford.note ? ` (${tamperingStatus.benford.note})` : ''}
+              </p>
+            )}
+
+            {isAdmin && isSuspicious && !tamperingStatus.electionDisabled && (
+              <div className="card-actions">
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={handleDisableSuspiciousElection}
+                  disabled={disableLoading}
+                >
+                  {disableLoading ? 'Disabling...' : 'Disable election'}
+                </button>
+              </div>
+            )}
+
+            {tamperingStatus.electionDisabled && <p className="form-error">This election is currently disabled.</p>}
+            {disableMessage && (
+              <p className={disableMessage.includes('disabled') ? 'form-success' : 'form-error'}>{disableMessage}</p>
+            )}
+          </div>
+        )}
+      </Card>
+
+      <Card title="Election statistics" className="statistics-card">
+        {rankedStats.length === 0 ? (
+          <p className="empty-state">No candidate statistics are available yet.</p>
+        ) : (
+          <div className="statistics-panel">
+            <div className="stat-grid">
+              <div className="stat-card">
+                <span className="stat-label">Total votes cast</span>
+                <strong className="stat-value">{statistics.totalVotes ?? 0}</strong>
+              </div>
+              <div className="stat-card">
+                <span className="stat-label">{leaderLabel}</span>
+                <strong className="stat-value stat-value-text">
+                  {statistics.leadingCandidate?.candidateName || 'Not available'}
+                </strong>
+              </div>
+              <div className="stat-card">
+                <span className="stat-label">Eligible voters</span>
+                <strong className="stat-value">{formatMetric(statistics.eligibleVoterCount)}</strong>
+              </div>
+              <div className="stat-card">
+                <span className="stat-label">Voter turnout</span>
+                <strong className="stat-value">{formatPercent(statistics.turnoutPercent)}</strong>
+              </div>
+            </div>
+
+            <div className="vote-chart" aria-label="Vote distribution bar chart">
+              {rankedStats.map((candidate) => {
+                const width = maxCandidateVotes ? Math.max((candidate.voteCount / maxCandidateVotes) * 100, 2) : 2;
+                return (
+                  <div className="vote-bar-row" key={String(candidate.candidateId)}>
+                    <div className="vote-bar-meta">
+                      <span>{candidate.rank}. {candidate.candidateName}</span>
+                      <strong>{candidate.voteCount} votes ({formatPercent(candidate.sharePercent)})</strong>
+                    </div>
+                    <div className="vote-bar-track">
+                      <span className="vote-bar-fill" style={{ width: `${width}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Rank</th>
+                    <th>Candidate</th>
+                    <th>Party</th>
+                    <th>Votes</th>
+                    <th>Share</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rankedStats.map((candidate) => (
+                    <tr key={`stats-${String(candidate.candidateId)}`}>
+                      <td>#{candidate.rank}</td>
+                      <td>{candidate.candidateName}</td>
+                      <td>{candidate.party || 'Independent'}</td>
+                      <td>{candidate.voteCount}</td>
+                      <td>{formatPercent(candidate.sharePercent)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </Card>
 
       <div className="dashboard-grid">
         <Card title="Candidates">
