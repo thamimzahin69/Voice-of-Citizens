@@ -370,57 +370,61 @@ async function getAreaVotingComparison(req, res, next) {
 }
 
 // Suspicious outcome detection using standard deviation
+async function analyzeSuspiciousOutcomes(electionId) {
+  const candidates = await Candidate.find({ election: electionId });
+  // Calculate vote distribution
+  const voteCounts = candidates.map((c) => c.voteCount || 0);
+  const totalVotes = voteCounts.reduce((a, b) => a + b, 0);
+  const benford = runBenfordAnalysis(voteCounts);
+
+  if (totalVotes === 0) {
+    return { message: 'No votes recorded yet', suspicious: false };
+  }
+
+  // Calculate mean
+  const mean = totalVotes / candidates.length;
+
+  // Calculate standard deviation
+  const variance = voteCounts.reduce((sum, count) => sum + Math.pow(count - mean, 2), 0) / candidates.length;
+  const stdDev = Math.sqrt(variance);
+
+  // Identify suspicious patterns
+  const suspicious = [];
+  const threshold = mean + 2 * stdDev; // Beyond 2 standard deviations
+
+  candidates.forEach((candidate) => {
+    const voteCount = candidate.voteCount || 0;
+    const zScore = stdDev > 0 ? (voteCount - mean) / stdDev : 0;
+
+    if (voteCount > threshold || zScore > 2) {
+      suspicious.push({
+        candidate: candidate.name,
+        votes: voteCount,
+        zScore: zScore.toFixed(2),
+        deviations: ((zScore * stdDev) / mean * 100).toFixed(2) + '%',
+        alert: 'UNUSUAL_VOTE_DISTRIBUTION',
+      });
+    }
+  });
+
+  return {
+    electionId,
+    totalVotes,
+    candidateCount: candidates.length,
+    mean: mean.toFixed(2),
+    standardDeviation: stdDev.toFixed(2),
+    threshold: threshold.toFixed(2),
+    suspiciousCount: suspicious.length,
+    suspiciousCandidates: suspicious,
+    benford,
+    isSuspicious: suspicious.length > 0 || benford.signal === 'possible-anomaly',
+  };
+}
+
 async function detectSuspiciousOutcomes(req, res, next) {
   try {
     const { electionId } = req.params;
-
-    const candidates = await Candidate.find({ election: electionId });
-    // Calculate vote distribution
-    const voteCounts = candidates.map((c) => c.voteCount || 0);
-    const totalVotes = voteCounts.reduce((a, b) => a + b, 0);
-    const benford = runBenfordAnalysis(voteCounts);
-
-    if (totalVotes === 0) {
-      return res.json({ message: 'No votes recorded yet', suspicious: false });
-    }
-
-    // Calculate mean
-    const mean = totalVotes / candidates.length;
-
-    // Calculate standard deviation
-    const variance = voteCounts.reduce((sum, count) => sum + Math.pow(count - mean, 2), 0) / candidates.length;
-    const stdDev = Math.sqrt(variance);
-
-    // Identify suspicious patterns
-    const suspicious = [];
-    const threshold = mean + 2 * stdDev; // Beyond 2 standard deviations
-
-    candidates.forEach((candidate) => {
-      const voteCount = candidate.voteCount || 0;
-      const zScore = stdDev > 0 ? (voteCount - mean) / stdDev : 0;
-
-      if (voteCount > threshold || zScore > 2) {
-        suspicious.push({
-          candidate: candidate.name,
-          votes: voteCount,
-          zScore: zScore.toFixed(2),
-          deviations: ((zScore * stdDev) / mean * 100).toFixed(2) + '%',
-          alert: 'UNUSUAL_VOTE_DISTRIBUTION',
-        });
-      }
-    });
-
-    res.json({
-      electionId,
-      totalVotes,
-      candidateCount: candidates.length,
-      mean: mean.toFixed(2),
-      standardDeviation: stdDev.toFixed(2),
-      suspiciousCount: suspicious.length,
-      suspiciousCandidates: suspicious,
-      benford,
-      isSuspicious: suspicious.length > 0 || benford.signal === 'possible-anomaly',
-    });
+    res.json(await analyzeSuspiciousOutcomes(electionId));
   } catch (err) {
     next(err);
   }
@@ -433,6 +437,7 @@ module.exports = {
   getDemographicBreakdown,
   getElectionDemographics,
   getAreaVotingComparison,
+  analyzeSuspiciousOutcomes,
   detectSuspiciousOutcomes,
   bulkCreateUsers,
   getAllUsers,

@@ -373,6 +373,95 @@ textarea.form-input {
   background: var(--info-bg);
 }
 
+.tampering-card {
+  margin-bottom: 18px;
+}
+
+.tampering-card-alert {
+  border-color: #fecaca;
+}
+
+.tampering-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.tampering-summary {
+  display: grid;
+  gap: 10px;
+}
+
+.tampering-summary p,
+.tampering-note {
+  margin: 0;
+  color: var(--muted);
+}
+
+.tampering-metrics .stat-card {
+  padding: 16px;
+}
+
+.tampering-metrics .stat-value {
+  font-size: 1.45rem;
+}
+
+.statistics-card {
+  margin-bottom: 18px;
+}
+
+.statistics-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.stat-value-text {
+  color: var(--text);
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+
+.vote-chart {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: #fbfdff;
+}
+
+.vote-bar-row {
+  display: grid;
+  gap: 8px;
+}
+
+.vote-bar-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--text);
+  font-weight: 800;
+}
+
+.vote-bar-meta strong {
+  color: var(--muted);
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.vote-bar-track {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.vote-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), #22c55e);
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--border);
@@ -998,6 +1087,16 @@ textarea.form-input {
 
   .form-stepper {
     grid-template-columns: 1fr;
+  }
+
+  .vote-bar-meta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .vote-bar-meta strong {
+    white-space: normal;
   }
 }
 
