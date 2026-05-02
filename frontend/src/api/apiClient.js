@@ -27,6 +27,9 @@ export const disableSuspiciousElection = (id) => apiClient.patch(`/elections/${i
 export const castVote = (electionId, data) => 
   apiClient.post(`/elections/${electionId}/vote`, data);
 
+export const fetchTestingElectionAssignments = (electionId) => apiClient.get(`/elections/${electionId}/testing-assignments`);
+export const generateTestingElectionVotes = (electionId) => apiClient.post(`/elections/${electionId}/generate-test-votes`);
+
 // ========== Join Election APIs ==========
 export const fetchJoinableElections = () => apiClient.get('/elections/joinable');
 export const joinElection = (electionId) => apiClient.post(`/elections/${electionId}/join`);

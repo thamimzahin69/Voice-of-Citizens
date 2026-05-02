@@ -14,6 +14,8 @@ const {
   getElectionStatus,
   getElectionTamperingStatus,
   disableSuspiciousElection,
+  getTestingAssignments,
+  generateTestVotes,
   getAllElections,
   getElectionById,
   inviteUsersToElection,
@@ -41,6 +43,10 @@ router.get('/predictions', requireAuth, predictions);
 // ========== Joinable elections ==========
 router.get('/joinable', requireAuth, getJoinableElections);
 router.post('/:id/join', requireAuth, joinElection);
+
+// ========== Testing management routes ==========
+router.get('/:id/testing-assignments', requireAuth, requireAdmin, getTestingAssignments);
+router.post('/:id/generate-test-votes', requireAuth, requireAdmin, generateTestVotes);
 
 // ========== Dynamic ID routes ==========
 router.get('/:id/status', requireAuth, getElectionStatus);

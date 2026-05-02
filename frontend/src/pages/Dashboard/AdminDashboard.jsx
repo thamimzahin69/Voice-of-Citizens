@@ -109,15 +109,21 @@ export default function AdminDashboard() {
                 {new Date(election.endDate).toLocaleString()}
               </p>
               <p><strong>Area:</strong> {election.area}</p>
+              <p><strong>Election mode:</strong> {election.mode === 'testing' ? 'Testing' : 'Actual'}</p>
               <p><strong>Voting Type:</strong> {election.votingType === 'majority' ? 'Majority Voting' : 'Rank Based Voting'}</p>
               <p><strong>Invited Users:</strong> {election.invitedUsers?.length || 0}</p>
               <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                 <Button onClick={() => openInviteModal(election)} className="btn-secondary">
                   Invite Voters
                 </Button>
-                <Link to={`/election-center/${election._id}`} className="btn btn-outline">
+                <Link to={`/election/${election._id}`} className="btn btn-outline">
                   View Details
                 </Link>
+                {election.mode === 'testing' && (
+                  <Link to={`/election/${election._id}/testing`} className="btn btn-warning">
+                    Manage Testing
+                  </Link>
+                )}
               </div>
               <span className="badge badge-info">{election.status || 'Configured'}</span>
             </Card>

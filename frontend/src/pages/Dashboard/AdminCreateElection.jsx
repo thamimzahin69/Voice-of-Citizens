@@ -5,6 +5,7 @@ import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 
 const initialElection = {
+  mode: 'actual',
   type: 'class-captain',
   title: '',
   description: '',
@@ -50,7 +51,7 @@ export default function AdminCreateElection() {
     try {
       const formData = new FormData();
       // Only append fields that backend expects
-      const fieldsToSend = ['type', 'title', 'description', 'votingType', 'area', 'startDate', 'endDate'];
+      const fieldsToSend = ['mode', 'type', 'title', 'description', 'votingType', 'area', 'startDate', 'endDate'];
       fieldsToSend.forEach((key) => {
         if (election[key] !== null && election[key] !== undefined) {
           formData.append(key, election[key]);
@@ -92,6 +93,13 @@ export default function AdminCreateElection() {
       <form className="form-stack card wide-card" onSubmit={handleSubmit}>
         {step === 1 && (
           <>
+            <label className="form-field">
+              <span className="form-label">Election mode</span>
+              <select value={election.mode} onChange={(e) => updateElection('mode', e.target.value)} className="form-input">
+                <option value="actual">Actual election</option>
+                <option value="testing">Testing election</option>
+              </select>
+            </label>
             <label className="form-field">
               <span className="form-label">Election type</span>
               <select value={election.type} onChange={(e) => updateElection('type', e.target.value)} className="form-input">

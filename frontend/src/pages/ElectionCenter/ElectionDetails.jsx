@@ -186,8 +186,18 @@ export default function ElectionDetails() {
         <p>{description}</p>
         <div className="card-actions">
           <span className={`badge ${statusClass(status)}`}>{status || 'Upcoming'}</span>
+          {election.mode === 'testing' && <span className="badge badge-warning">Testing election</span>}
           {hasVoted && <span className="badge badge-voted">You have voted</span>}
           <span className="badge badge-info">{formatDate(startDate)} to {formatDate(endDate)}</span>
+          {isAdmin && election.mode === 'testing' && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => navigate(`/election/${id}/testing`)}
+            >
+              Manage Testing
+            </button>
+          )}
           <button 
             type="button" 
             className="btn btn-primary" 

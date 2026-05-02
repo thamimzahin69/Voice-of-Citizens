@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const electionSchema = new mongoose.Schema(
   {
     type: { type: String, default: 'custom' },
+    mode: { type: String, enum: ['actual', 'testing'], default: 'actual' },
     title: { type: String, required: true },
     description: { type: String, default: '' },
     votingType: { type: String, enum: ['majority', 'rankBased'], required: true },
