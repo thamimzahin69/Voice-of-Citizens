@@ -141,11 +141,22 @@ async function buildElectionStatistics({ election, leaderboard, totalVotes, winn
   };
 }
 
+function userCanAccessElection(election, user) {
+  if (!election) return false;
+  if (election.mode === 'testing' && user.role !== 'admin') return false;
+  return user.role === 'admin' || election.area === user.area || election.invitedUsers.includes(user._id);
+}
+
 // ==================== EXISTING FUNCTIONS (preserved) ====================
 
 async function createElection(req, res, next) {
   try {
-    const { type, title, description, startDate, endDate, votingType, area } = req.body;
+    const { mode = 'actual', type, title, description, startDate, endDate, votingType, area } = req.body;
+
+    // Validate election mode
+    if (!['actual', 'testing'].includes(mode)) {
+      return res.status(422).json({ message: 'Invalid election mode. Must be "actual" or "testing"' });
+    }
 
     // Validate voting type
     if (!votingType || !['majority', 'rankBased'].includes(votingType)) {
@@ -158,6 +169,7 @@ async function createElection(req, res, next) {
     }
 
     const election = await Election.create({
+      mode,
       type,
       title,
       description,
@@ -216,8 +228,9 @@ async function listAllElections(req, res, next) {
       return res.json(elections);
     }
 
-    // Regular users can see elections in their area or they are invited to
+    // Regular users can see elections in their area or they are invited to, excluding testing mode
     const query = {
+      mode: { $ne: 'testing' },
       $or: [
         { area: user.area },
         { invitedUsers: user._id }
@@ -244,7 +257,8 @@ async function listActiveElections(req, res, next) {
 
     // Admin can see all active elections
     if (user.role !== 'admin') {
-      // Regular users can only see elections in their area or they are invited to
+      // Regular users can only see elections in their area or they are invited to, excluding testing mode
+      query.mode = { $ne: 'testing' };
       query.$or = [
         { area: user.area },
         { invitedUsers: user._id }
@@ -261,7 +275,12 @@ async function listActiveElections(req, res, next) {
 async function listHistory(req, res, next) {
   try {
     const now = new Date();
-    const elections = await Election.find({ endDate: { $lt: now } }).sort({ endDate: -1 });
+    const query = { endDate: { $lt: now } };
+    if (!req.user || req.user.role !== 'admin') {
+      query.mode = { $ne: 'testing' };
+    }
+
+    const elections = await Election.find(query).sort({ endDate: -1 });
     res.json(elections);
   } catch (err) {
     next(err);
@@ -277,11 +296,8 @@ async function listCandidates(req, res, next) {
     const election = await Election.findById(electionId);
     if (!election) return res.status(404).json({ message: 'Election not found' });
 
-    if (user.role !== 'admin') {
-      const canAccess = election.area === user.area || election.invitedUsers.includes(user._id);
-      if (!canAccess) {
-        return res.status(403).json({ message: 'You are not eligible to view this election' });
-      }
+    if (!userCanAccessElection(election, user)) {
+      return res.status(403).json({ message: 'You are not eligible to view this election' });
     }
 
     const candidates = await Candidate.find({ election: electionId }).select(
@@ -320,11 +336,8 @@ async function listManifestos(req, res, next) {
     const election = await Election.findById(electionId);
     if (!election) return res.status(404).json({ message: 'Election not found' });
 
-    if (user.role !== 'admin') {
-      const canAccess = election.area === user.area || election.invitedUsers.includes(user._id);
-      if (!canAccess) {
-        return res.status(403).json({ message: 'You are not eligible to view this election' });
-      }
+    if (!userCanAccessElection(election, user)) {
+      return res.status(403).json({ message: 'You are not eligible to view this election' });
     }
 
     const candidates = await Candidate.find({ election: electionId });
@@ -348,11 +361,8 @@ async function results(req, res, next) {
     const election = await Election.findById(electionId);
     if (!election) return res.status(404).json({ message: 'Election not found' });
 
-    if (user.role !== 'admin') {
-      const canAccess = election.area === user.area || election.invitedUsers.includes(user._id);
-      if (!canAccess) {
-        return res.status(403).json({ message: 'You are not eligible to view this election' });
-      }
+    if (!userCanAccessElection(election, user)) {
+      return res.status(403).json({ message: 'You are not eligible to view this election' });
     }
 
     const candidates = await Candidate.find({ election: electionId }).lean();
@@ -431,6 +441,7 @@ async function predictions(req, res, next) {
       elections = await Election.find();
     } else {
       elections = await Election.find({
+        mode: { $ne: 'testing' },
         $or: [
           { area: user.area },
           { invitedUsers: user._id }
@@ -481,14 +492,15 @@ async function getJoinableElections(req, res, next) {
 
     // Admin can see all joinable elections
     if (user.role !== 'admin') {
-      // Regular users can only see elections in their area or they are invited to
+      // Regular users can only see elections in their area or they are invited to, excluding testing mode
+      query.mode = { $ne: 'testing' };
       query.$or = [
         { area: user.area },
         { invitedUsers: user._id }
       ];
     }
 
-    const elections = await Election.find(query).select('title description startDate endDate votingType area');
+    const elections = await Election.find(query).select('title description startDate endDate votingType area mode');
 
     const votes = await Vote.find({ voter: user._id }).distinct('election');
 
@@ -514,11 +526,8 @@ async function joinElection(req, res, next) {
     if (!election) return res.status(404).json({ msg: 'Election not found' });
 
     // Check if user is allowed to join this election
-    if (user.role !== 'admin') {
-      const canAccess = election.area === user.area || election.invitedUsers.includes(user._id);
-      if (!canAccess) {
-        return res.status(403).json({ msg: 'You are not eligible to join this election' });
-      }
+    if (!userCanAccessElection(election, user)) {
+      return res.status(403).json({ msg: 'You are not eligible to join this election' });
     }
 
     const now = new Date();
@@ -557,11 +566,8 @@ async function getElectionStatus(req, res, next) {
     if (!election) return res.status(404).json({ msg: 'Election not found' });
 
     // Check if user can access this election
-    if (user.role !== 'admin') {
-      const canAccess = election.area === user.area || election.invitedUsers.includes(user._id);
-      if (!canAccess) {
-        return res.status(403).json({ message: 'You are not eligible to view this election' });
-      }
+    if (!userCanAccessElection(election, user)) {
+      return res.status(403).json({ message: 'You are not eligible to view this election' });
     }
 
     const joined = election.voters?.includes(user._id) || false;
@@ -581,11 +587,8 @@ async function getElectionTamperingStatus(req, res, next) {
     const election = await Election.findById(electionId).lean();
     if (!election) return res.status(404).json({ message: 'Election not found' });
 
-    if (user.role !== 'admin') {
-      const canAccess = election.area === user.area || election.invitedUsers.some((id) => id.toString() === user._id.toString());
-      if (!canAccess) {
-        return res.status(403).json({ message: 'You are not eligible to view this election' });
-      }
+    if (!userCanAccessElection(election, user)) {
+      return res.status(403).json({ message: 'You are not eligible to view this election' });
     }
 
     const analysis = await analyzeSuspiciousOutcomes(electionId);
@@ -628,6 +631,165 @@ async function disableSuspiciousElection(req, res, next) {
   }
 }
 
+function shuffleArray(items) {
+  const array = [...items];
+  for (let i = array.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+async function getTestingAssignments(req, res, next) {
+  try {
+    const electionId = req.params.id;
+    const election = await Election.findById(electionId).lean();
+    if (!election) return res.status(404).json({ message: 'Election not found' });
+    if (election.mode !== 'testing') {
+      return res.status(400).json({ message: 'This endpoint is only available for testing elections' });
+    }
+
+    const voters = await User.find({
+      area: election.area,
+      documentStatus: 'verified',
+      role: 'user',
+    }).select('name email locality area anonymousHash').lean();
+
+    const candidateList = await Candidate.find({ election: electionId }).lean();
+    const voteDocs = await Vote.find({ election: electionId, voter: { $in: voters.map((v) => v._id) } }).lean();
+    const voteMap = voteDocs.reduce((acc, vote) => {
+      acc[vote.voter.toString()] = vote;
+      return acc;
+    }, {});
+
+    const votersWithAssignments = voters.map((voter) => {
+      const vote = voteMap[voter._id.toString()];
+      let voteDetails = null;
+      if (vote) {
+        if (vote.candidate) {
+          const candidate = candidateList.find((c) => c._id.toString() === vote.candidate.toString());
+          voteDetails = {
+            type: 'majority',
+            candidateId: vote.candidate,
+            candidateName: candidate?.name || 'Unknown candidate',
+          };
+        } else if (Array.isArray(vote.ranked)) {
+          voteDetails = {
+            type: 'rankBased',
+            ranked: vote.ranked.map((id) => {
+              const candidate = candidateList.find((c) => c._id.toString() === id.toString());
+              return {
+                candidateId: id,
+                candidateName: candidate?.name || 'Unknown candidate',
+              };
+            }),
+          };
+        }
+      }
+
+      return {
+        _id: voter._id,
+        name: voter.name,
+        email: voter.email,
+        locality: voter.locality || 'Unknown',
+        area: voter.area,
+        hasVoted: Boolean(vote),
+        voteDetails,
+      };
+    });
+
+    res.json({
+      election: {
+        _id: election._id,
+        title: election.title,
+        area: election.area,
+        votingType: election.votingType,
+        startDate: election.startDate,
+        endDate: election.endDate,
+        mode: election.mode,
+      },
+      candidates: candidateList.map((c) => ({ _id: c._id, name: c.name, party: c.party || 'Independent' })),
+      voters: votersWithAssignments,
+      voterCount: votersWithAssignments.length,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function generateTestVotes(req, res, next) {
+  try {
+    const electionId = req.params.id;
+    const election = await Election.findById(electionId);
+    if (!election) return res.status(404).json({ message: 'Election not found' });
+    if (election.mode !== 'testing') {
+      return res.status(400).json({ message: 'This endpoint is only available for testing elections' });
+    }
+
+    const voters = await User.find({
+      area: election.area,
+      documentStatus: 'verified',
+      role: 'user',
+    }).select('name email locality area anonymousHash').lean();
+
+    if (voters.length === 0) {
+      return res.json({ message: 'No verified users assigned to this election area', generatedVotes: 0 });
+    }
+
+    const candidates = await Candidate.find({ election: electionId }).lean();
+    if (candidates.length === 0) {
+      return res.status(400).json({ message: 'No candidates are configured for this election' });
+    }
+
+    const voterIds = voters.map((voter) => voter._id);
+    await Vote.deleteMany({ election: electionId, voter: { $in: voterIds } });
+
+    const votesToInsert = voters.map((voter) => {
+      if (election.votingType === 'majority') {
+        const randomCandidate = candidates[Math.floor(Math.random() * candidates.length)];
+        return {
+          election: electionId,
+          candidate: randomCandidate._id,
+          voter: voter._id,
+          anonymousHash: voter.anonymousHash,
+          ipAddress: req.ip,
+        };
+      }
+
+      const rankedCandidateIds = shuffleArray(candidates.map((c) => c._id));
+      return {
+        election: electionId,
+        ranked: rankedCandidateIds,
+        voter: voter._id,
+        anonymousHash: voter.anonymousHash,
+        ipAddress: req.ip,
+      };
+    });
+
+    await Vote.insertMany(votesToInsert, { ordered: false });
+
+    if (election.votingType === 'majority') {
+      await Candidate.updateMany({ election: electionId }, { $set: { voteCount: 0 } });
+      const tally = {};
+      votesToInsert.forEach((vote) => {
+        const candidateId = vote.candidate.toString();
+        tally[candidateId] = (tally[candidateId] || 0) + 1;
+      });
+      await Promise.all(Object.entries(tally).map(([candidateId, count]) =>
+        Candidate.findByIdAndUpdate(candidateId, { $inc: { voteCount: count } })
+      ));
+    }
+
+    res.json({
+      message: 'Generated random test votes for assigned users',
+      generatedVotes: votesToInsert.length,
+      voterCount: voters.length,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ==================== NEW FUNCTIONS FOR REQUIREMENT ====================
 
 // @desc    Get all elections for logged-in user (enriched with status, hasVoted, candidateCount)
@@ -642,8 +804,9 @@ async function getAllElections(req, res, next) {
 
     // Admin can see all elections
     if (user.role !== 'admin') {
-      // Regular users can only see elections in their area or they are invited to
+      // Regular users can only see elections in their area or they are invited to, excluding testing mode
       query = {
+        mode: { $ne: 'testing' },
         $or: [
           { area: user.area },
           { invitedUsers: user._id }
@@ -690,11 +853,8 @@ async function getElectionById(req, res, next) {
     if (!election) return res.status(404).json({ message: 'Election not found' });
 
     // Check if user is allowed to view this election
-    if (user.role !== 'admin') {
-      const canAccess = election.area === user.area || election.invitedUsers.includes(user._id);
-      if (!canAccess) {
-        return res.status(403).json({ message: 'You are not eligible to view this election' });
-      }
+    if (!userCanAccessElection(election, user)) {
+      return res.status(403).json({ message: 'You are not eligible to view this election' });
     }
 
     const now = new Date();
@@ -811,11 +971,8 @@ async function castVoteWithNid(req, res, next) {
     }
 
     // Check if user is allowed to vote in this election
-    if (req.user.role !== 'admin') {
-      const canAccess = election.area === req.user.area || election.invitedUsers.includes(req.user._id);
-      if (!canAccess) {
-        return res.status(403).json({ message: 'You are not eligible to vote in this election' });
-      }
+    if (!userCanAccessElection(election, req.user)) {
+      return res.status(403).json({ message: 'You are not eligible to vote in this election' });
     }
 
     const now = new Date();
@@ -962,6 +1119,8 @@ module.exports = {
   getElectionStatus,
   getElectionTamperingStatus,
   disableSuspiciousElection,
+  getTestingAssignments,
+  generateTestVotes,
   getAllElections,                // new
   getElectionById,               // new
   inviteUsersToElection,         // new
