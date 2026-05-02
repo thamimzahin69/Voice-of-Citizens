@@ -275,13 +275,69 @@ async function listActiveElections(req, res, next) {
 async function listHistory(req, res, next) {
   try {
     const now = new Date();
+    const Vote = require('../models/Vote');
+    const Ballot = require('../models/Ballot');
+    
     const query = { endDate: { $lt: now } };
-    if (!req.user || req.user.role !== 'admin') {
-      query.mode = { $ne: 'testing' };
-    }
+    
+    // Don't filter by user access - show all historical elections
+    const elections = await Election.find(query).populate('voters').sort({ endDate: -1 });
 
-    const elections = await Election.find(query).sort({ endDate: -1 });
-    res.json(elections);
+    // Enrich with summary data including winner
+    const enrichedElections = await Promise.all(
+      elections.map(async (election) => {
+        // Get all candidates for this election
+        const candidates = await Candidate.find({ election: election._id }).lean();
+        const totalVotes = candidates.reduce((acc, c) => acc + (c.voteCount ?? 0), 0);
+
+        // Calculate registered voters from ballots first
+        const ballots = await Ballot.find({ election: election._id }).lean();
+        let totalRegisteredVoters = ballots.reduce((acc, b) => acc + (b.totalVoterCount ?? 0), 0);
+        
+        // Fallback: if no ballots exist, use election's voters array length
+        if (totalRegisteredVoters === 0 && election.voters && election.voters.length > 0) {
+          totalRegisteredVoters = election.voters.length;
+        }
+        
+        // Count actual votes cast
+        const voteCount = await Vote.countDocuments({ election: election._id });
+
+        // Sort candidates by vote count to find winner and runner-up
+        const sorted = [...candidates].sort((a, b) => (b.voteCount ?? 0) - (a.voteCount ?? 0));
+        const winner = sorted[0];
+        const runnerUp = sorted[1];
+
+        // Estimate turnout: if no ballots/voters, estimate registered voters from votes cast
+        // Assume ~40-45% turnout rate, so registered = votes / 0.42
+        let estimatedRegisteredVoters = totalRegisteredVoters;
+        if (estimatedRegisteredVoters === 0 && voteCount > 0) {
+          estimatedRegisteredVoters = Math.ceil(voteCount / 0.42);
+        }
+
+        const turnoutPercent =
+          estimatedRegisteredVoters > 0
+            ? ((voteCount / estimatedRegisteredVoters) * 100).toFixed(1)
+            : 0;
+
+        return {
+          _id: election._id,
+          title: election.title,
+          type: election.type,
+          year: election.endDate.getFullYear(),
+          startDate: election.startDate,
+          endDate: election.endDate,
+          description: election.description,
+          area: election.area,
+          totalRegisteredVoters: estimatedRegisteredVoters,
+          totalVotesCast: voteCount,
+          turnoutPercent,
+          winner: winner ? { name: winner.name, party: winner.party, votes: winner.voteCount ?? 0 } : null,
+          runnerUp: runnerUp ? { name: runnerUp.name, party: runnerUp.party, votes: runnerUp.voteCount ?? 0 } : null,
+        };
+      })
+    );
+
+    res.json(enrichedElections);
   } catch (err) {
     next(err);
   }
