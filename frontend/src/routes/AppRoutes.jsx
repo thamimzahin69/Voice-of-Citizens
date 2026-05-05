@@ -14,6 +14,7 @@ import ApprovalRequests from '../pages/Dashboard/ApprovalRequests';
 import BulkUserImport from '../pages/Dashboard/BulkUserImport';
 import JoinElection from '../pages/Dashboard/JoinElection';
 import ElectionHistory from '../pages/Dashboard/ElectionHistory';
+import RecurrentElections from '../pages/Dashboard/RecurrentElections';
 import Predictions from '../pages/Dashboard/Predictions';
 import ComplaintsPageContainer from '../pages/Dashboard/ComplaintsPageContainer';
 import Chats from '../pages/Dashboard/Chats';
@@ -52,6 +53,7 @@ export default function AppRoutes() {
             <Route path="complete-profile" element={<CompleteProfile />} />
             <Route path="join-election" element={<JoinElection />} />
             <Route path="history" element={<ElectionHistory />} />
+            <Route path="recurrent" element={<RecurrentElections />} />
             <Route path="predictions" element={<Predictions />} />
             <Route path="complaints" element={<ComplaintsPageContainer />} />
             <Route path="chats" element={<Chats />} />

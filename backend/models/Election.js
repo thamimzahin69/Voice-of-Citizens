@@ -13,7 +13,9 @@ const electionSchema = new mongoose.Schema(
     isPublished: { type: Boolean, default: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     voters: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    invitedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+    invitedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    totalRegisteredVoters: { type: Number, default: 0 },
+    totalVotesCast: { type: Number, default: 0 }
   },
   { timestamps: true }
 );
