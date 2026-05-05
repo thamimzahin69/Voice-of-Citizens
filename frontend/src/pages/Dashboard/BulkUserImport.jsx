@@ -87,6 +87,46 @@ export default function BulkUserImport() {
             <div className="stat-card"><strong className="stat-value">{result.created?.length || 0}</strong><span className="stat-label">Created</span></div>
             <div className="stat-card"><strong className="stat-value">{result.errors?.length || 0}</strong><span className="stat-label">Errors</span></div>
           </div>
+
+          {result.created && result.created.length > 0 && (
+            <div style={{ marginTop: '18px' }}>
+              <h3>Created Users</h3>
+              <p className="text-warning">⚠️ Please securely communicate the temporary passwords to users. They will need to change their password and upload their NID document on first login.</p>
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Area</th>
+                      <th>Temporary Password</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.created.map((user, index) => (
+                      <tr key={index}>
+                        <td>{user.email}</td>
+                        <td>{user.role}</td>
+                        <td>{user.area}</td>
+                        <td><code>{user.tempPassword}</code></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {result.errors && result.errors.length > 0 && (
+            <div style={{ marginTop: '18px' }}>
+              <h3>Errors</h3>
+              <ul className="error-list">
+                {result.errors.map((error, index) => (
+                  <li key={index}>Row {error.row}: {error.message}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
       )}
     </section>

@@ -90,9 +90,7 @@ async function bulkCreateUsers(req, res, next) {
         area,
         role,
         documentPath,
-        documentStatus: 'verified',
-        documentVerifiedAt: new Date(),
-        documentVerifiedBy: req.user._id,
+        documentStatus: 'pending', // Changed from 'verified' to 'pending'
         importedByAdmin: true,
         forcePasswordReset: true,
       });

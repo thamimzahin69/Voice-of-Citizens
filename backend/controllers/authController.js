@@ -90,7 +90,9 @@ async function login(req, res, next) {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    if (user.documentStatus !== 'verified' && user.role !== 'admin') {
+    const canLoginPendingImported = user.importedByAdmin && user.forcePasswordReset && user.documentStatus === 'pending';
+
+    if (user.documentStatus !== 'verified' && user.role !== 'admin' && !canLoginPendingImported) {
       const message = user.documentStatus === 'pending'
         ? 'Account pending admin approval.'
         : 'Registration rejected by admin.';
@@ -142,7 +144,8 @@ async function completeProfile(req, res, next) {
     user.password = password;
     user.nid = nid;
     user.forcePasswordReset = false;
-    user.documentStatus = 'pending';
+    // Bulk-created users are automatically verified since admin already approved them
+    user.documentStatus = user.importedByAdmin ? 'verified' : 'pending';
 
     if (req.file) {
       user.documentPath = path.basename(req.file.path);
